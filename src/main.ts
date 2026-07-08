@@ -74,10 +74,23 @@ async function initNano() {
   const capability = await detectCapability()
   const bannerEl = document.querySelector('#capability-banner') as HTMLElement
 
+  console.log('Nano capability:', capability)
+
   if (capability.available) {
-    nanoState = createAvailableState(await createSession())
-    nanoSession = nanoState.session
-    renderCapabilityBanner(bannerEl, true)
+    try {
+      const session = await createSession()
+      nanoState = createAvailableState(session)
+      nanoSession = nanoState.session
+      renderCapabilityBanner(bannerEl, true)
+      console.log('Nano session created successfully')
+    } catch (e) {
+      console.error('Failed to create Nano session:', e)
+      nanoState = createUnavailableState(String(e))
+      renderCapabilityBanner(bannerEl, false, String(e))
+      const fallbackEl = document.querySelector('#fallback-container') as HTMLElement
+      renderFallbackMode(fallbackEl)
+      fallbackEl.style.display = 'block'
+    }
   } else {
     nanoState = createUnavailableState(capability.error || 'Not available')
     renderCapabilityBanner(bannerEl, false, capability.error)
@@ -188,24 +201,41 @@ async function handleAsk(question: string) {
   createAnswerView(answerEl)
   showLoading(answerEl)
 
+  console.log('handleAsk - nanoSession:', !!nanoSession)
+
   try {
     const allChunks = await getAllChunks()
+    console.log('Total chunks in DB:', allChunks.length)
+
+    if (allChunks.length === 0) {
+      hideLoading(answerEl)
+      setAnswer(answerEl, 'No documents ingested yet. Please drag and drop some files first.')
+      return
+    }
+
     const candidateIds = shortlistCandidates(allChunks, question)
+    console.log('Candidate IDs:', candidateIds)
+
     const topKChunks = await loadTopKChunks(candidateIds.slice(0, 10))
+    console.log('Top K chunks loaded:', topKChunks.length)
 
     if (topKChunks.length === 0) {
       hideLoading(answerEl)
-      setAnswer(answerEl, 'No relevant documents found. Please ingest some documents first.')
+      setAnswer(answerEl, 'No relevant documents found. Try rephrasing your question.')
       return
     }
 
     let answer: string
     if (nanoSession) {
+      console.log('Using Nano LLM for answer...')
       const prompt = buildGroundedPrompt(topKChunks, question)
+      console.log('Prompt length:', prompt.length)
       answer = await nanoSession.prompt(prompt)
+      console.log('Nano answer received:', answer.substring(0, 100))
     } else {
-      const summaries = topKChunks.map((c) => c.summary || c.text.slice(0, 200)).join('\n')
-      answer = `Based on keyword matching:\n\n${summaries}`
+      console.log('Using fallback mode (no Nano)')
+      const summaries = topKChunks.map((c) => c.summary || c.text.slice(0, 200)).join('\n\n')
+      answer = `Based on keyword matching (Chrome AI not available):\n\n${summaries}\n\nTo enable AI answers, visit chrome://flags/#enable-built-in-ai and enable "Built-in AI".`
     }
 
     hideLoading(answerEl)
@@ -224,6 +254,7 @@ async function handleAsk(question: string) {
       })
     }
   } catch (e) {
+    console.error('Error in handleAsk:', e)
     hideLoading(answerEl)
     setAnswer(answerEl, `Error: ${e instanceof Error ? e.message : String(e)}`)
   }
