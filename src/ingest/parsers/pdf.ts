@@ -1,7 +1,10 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import type { ParsedContent } from './txt'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).href
 
 export async function parsePdf(file: File): Promise<ParsedContent> {
   const arrayBuffer = await file.arrayBuffer()
