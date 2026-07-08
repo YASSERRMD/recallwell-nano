@@ -25,6 +25,7 @@
   "author": "YASSERRMD",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@typescript-eslint/eslint-plugin": "^8.63.0",
     "@typescript-eslint/parser": "^8.63.0",
     "eslint": "^10.6.0",
