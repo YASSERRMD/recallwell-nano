@@ -17,3 +17,13 @@ export interface Chunk {
   summary: string
   keywords: string
 }
+
+export interface Manifest {
+  id?: number
+  kbName: string
+  createdAt: number
+  docCount: number
+  chunkCount: number
+  version: string
+  contentHash: string
+}
