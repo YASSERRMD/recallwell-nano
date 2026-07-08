@@ -39,6 +39,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@types/dom-chromium-ai": "^0.0.17",
     "dexie": "^4.4.4",
     "pdfjs-dist": "^6.1.200"
   }

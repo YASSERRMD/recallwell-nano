@@ -1,5 +1,3 @@
-import './types'
-
 export interface NanoCapability {
   available: boolean
   error?: string
@@ -7,20 +5,16 @@ export interface NanoCapability {
 
 export async function detectCapability(): Promise<NanoCapability> {
   try {
-    if (!window.ai) {
-      return { available: false, error: 'window.ai not available' }
-    }
-
-    if (!window.ai.languageModel) {
+    if (!('LanguageModel' in self)) {
       return { available: false, error: 'LanguageModel API not available' }
     }
 
-    const canCreate = await window.ai.languageModel.capabilities()
-    if (canCreate && canCreate.available) {
-      return { available: true }
+    const availability = await LanguageModel.availability()
+    if (availability === 'unavailable') {
+      return { available: false, error: 'Model unavailable on this device' }
     }
 
-    return { available: false, error: 'LanguageModel not ready' }
+    return { available: true }
   } catch (e) {
     return { available: false, error: String(e) }
   }
