@@ -1,35 +1,34 @@
 import type { Document } from '../db/types'
 
-export interface DocumentListCallbacks {
-  onDelete: (id: number) => void
-}
-
 export function renderDocumentList(
   container: HTMLElement,
   documents: Document[],
-  callbacks: DocumentListCallbacks,
+  callbacks: { onDelete: (id: number) => void },
 ): void {
+  if (documents.length === 0) {
+    container.innerHTML = `<div class="empty-state">No documents ingested yet. Drop some files above to get started.</div>`
+    return
+  }
+
   container.innerHTML = `
-    <div class="document-list">
-      <h3>Documents</h3>
-      ${documents.length === 0 ? '<p>No documents ingested yet.</p>' : ''}
-      <ul id="doc-list">
-        ${documents
-          .map(
-            (doc) => `
-          <li>
-            <span>${doc.title}</span>
-            <span class="doc-meta">${doc.mime} - ${new Date(doc.ingestedAt).toLocaleDateString()}</span>
-            <button class="delete-btn" data-id="${doc.id}">Delete</button>
-          </li>
-        `,
-          )
-          .join('')}
-      </ul>
-    </div>
+    <ul class="doc-list">
+      ${documents
+        .map(
+          (doc) => `
+        <li class="doc-item">
+          <div class="doc-info">
+            <span class="doc-name">${doc.title}</span>
+            <span class="doc-meta">${doc.mime} &middot; ${new Date(doc.ingestedAt).toLocaleDateString()}</span>
+          </div>
+          <button class="doc-delete" data-id="${doc.id}">Remove</button>
+        </li>
+      `,
+        )
+        .join('')}
+    </ul>
   `
 
-  container.querySelectorAll('.delete-btn').forEach((btn) => {
+  container.querySelectorAll('.doc-delete').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = parseInt(btn.getAttribute('data-id') || '0', 10)
       if (id) callbacks.onDelete(id)

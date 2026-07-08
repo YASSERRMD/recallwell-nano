@@ -1,15 +1,11 @@
-export interface QuestionInputCallbacks {
-  onAsk: (question: string) => void
-}
-
 export function createQuestionInput(
   container: HTMLElement,
-  callbacks: QuestionInputCallbacks,
+  callbacks: { onAsk: (question: string) => void },
 ): void {
   container.innerHTML = `
-    <div class="question-input">
-      <input type="text" id="question" placeholder="Ask a question..." />
-      <button id="ask-btn">Ask</button>
+    <div class="question-form">
+      <input type="text" class="question-input" id="question" placeholder="Ask anything about your documents...">
+      <button class="ask-btn" id="ask-btn">Ask</button>
     </div>
   `
 

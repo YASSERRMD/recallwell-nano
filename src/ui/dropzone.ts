@@ -1,32 +1,24 @@
-export interface DropzoneOptions {
-  onFiles: (files: File[]) => void
-  accept?: string[]
-}
-
-export function createDropzone(container: HTMLElement, options: DropzoneOptions): void {
-  const { onFiles, accept = ['.txt', '.md', '.html', '.pdf'] } = options
+export function createDropzone(container: HTMLElement, options: { onFiles: (files: File[]) => void }): void {
+  const { onFiles } = options
 
   container.innerHTML = `
     <div class="dropzone" id="dropzone">
-      <p>Drag and drop files here</p>
-      <p>or</p>
-      <button id="file-select">Select files</button>
-      <input type="file" id="file-input" multiple accept="${accept.join(',')}" hidden>
-      <p class="dropzone-hint">Supported: ${accept.join(', ')}</p>
+      <div class="dropzone-icon">📁</div>
+      <div class="dropzone-text">Drag and drop files here, or <strong>browse</strong></div>
+      <div class="dropzone-hint">Supports .txt, .md, .html, .pdf</div>
+      <input type="file" id="file-input" multiple accept=".txt,.md,.html,.pdf" hidden>
     </div>
   `
 
   const dropzone = container.querySelector('#dropzone') as HTMLElement
   const fileInput = container.querySelector('#file-input') as HTMLInputElement
-  const fileSelect = container.querySelector('#file-select') as HTMLButtonElement
 
-  fileSelect.addEventListener('click', () => fileInput.click())
+  dropzone.addEventListener('click', () => fileInput.click())
 
   fileInput.addEventListener('change', () => {
     const files = Array.from(fileInput.files || [])
-    if (files.length > 0) {
-      onFiles(files)
-    }
+    if (files.length > 0) onFiles(files)
+    fileInput.value = ''
   })
 
   dropzone.addEventListener('dragover', (e) => {
@@ -42,8 +34,6 @@ export function createDropzone(container: HTMLElement, options: DropzoneOptions)
     e.preventDefault()
     dropzone.classList.remove('dropzone-active')
     const files = Array.from(e.dataTransfer?.files || [])
-    if (files.length > 0) {
-      onFiles(files)
-    }
+    if (files.length > 0) onFiles(files)
   })
 }

@@ -1,16 +1,13 @@
 import type { Chunk } from '../db/types'
 
-export interface CitationChipsCallbacks {
-  onCitationClick: (chunk: Chunk) => void
-}
-
 export function renderCitationChips(
   container: HTMLElement,
   chunks: Chunk[],
-  callbacks: CitationChipsCallbacks,
+  callbacks: { onCitationClick: (chunk: Chunk) => void },
 ): void {
   container.innerHTML = `
-    <div class="citation-chips">
+    <div class="citations">
+      <span class="citations-label">Sources:</span>
       ${chunks
         .map(
           (chunk) => `

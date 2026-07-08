@@ -32,72 +32,71 @@ import { computeContentHash } from './export/hash'
 import { compressData } from './export/compress'
 import { triggerDownload } from './export/download'
 
-let nanoState: NanoState = createUnavailableState('Not initialized')
 let nanoSession: NanoSession | null = null
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
 app.innerHTML = `
-  <header>
-    <h1>Recallwell Nano</h1>
-    <p>On-device, vectorless knowledge-base Q&A</p>
-  </header>
-  <div id="capability-banner"></div>
-  <main>
-    <section id="ingest-section">
-      <h2>Ingest Documents</h2>
+  <div class="app">
+    <header class="header">
+      <h1>Recallwell Nano</h1>
+      <p>On-device, vectorless knowledge-base Q&A</p>
+    </header>
+
+    <div id="capability-banner"></div>
+
+    <div class="section">
+      <h2 class="section-title">Ingest Documents</h2>
       <div id="dropzone-container"></div>
-      <div id="progress-container" style="display: none;"></div>
+      <div id="progress-container" class="progress-container" style="display: none;"></div>
       <div id="error-container"></div>
-    </section>
-    <section id="kb-section">
-      <h2>Knowledge Base</h2>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title">Knowledge Base</h2>
       <div id="manifest-container"></div>
       <div id="document-list-container"></div>
-    </section>
-    <section id="qa-section">
-      <h2>Ask a Question</h2>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title">Ask a Question</h2>
       <div id="fallback-container" style="display: none;"></div>
       <div id="question-container"></div>
       <div id="answer-container"></div>
       <div id="citations-container"></div>
       <div id="chunk-drawer-container"></div>
-    </section>
-    <section id="export-section">
-      <h2>Publish</h2>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title">Publish</h2>
       <div id="export-container"></div>
-    </section>
-  </main>
+    </div>
+  </div>
 `
 
 async function initNano() {
   const capability = await detectCapability()
   const bannerEl = document.querySelector('#capability-banner') as HTMLElement
 
-  console.log('Nano capability:', capability)
-
   if (capability.available) {
     try {
       const session = await createSession()
-      nanoState = createAvailableState(session)
-      nanoSession = nanoState.session
+      nanoSession = session
       renderCapabilityBanner(bannerEl, true)
-      console.log('Nano session created successfully')
-    } catch (e) {
-      console.error('Failed to create Nano session:', e)
-      nanoState = createUnavailableState(String(e))
-      renderCapabilityBanner(bannerEl, false, String(e))
-      const fallbackEl = document.querySelector('#fallback-container') as HTMLElement
-      renderFallbackMode(fallbackEl)
-      fallbackEl.style.display = 'block'
+    } catch {
+      renderCapabilityBanner(bannerEl, false, 'Failed to create session')
+      showFallback()
     }
   } else {
-    nanoState = createUnavailableState(capability.error || 'Not available')
     renderCapabilityBanner(bannerEl, false, capability.error)
-    const fallbackEl = document.querySelector('#fallback-container') as HTMLElement
-    renderFallbackMode(fallbackEl)
-    fallbackEl.style.display = 'block'
+    showFallback()
   }
+}
+
+function showFallback() {
+  const fallbackEl = document.querySelector('#fallback-container') as HTMLElement
+  renderFallbackMode(fallbackEl)
+  fallbackEl.style.display = 'block'
 }
 
 async function refreshDocList() {
@@ -121,7 +120,7 @@ async function handleFiles(files: File[]) {
 
   const errorEl = document.querySelector('#error-container') as HTMLElement
   if (invalid.length > 0) {
-    errorEl.innerHTML = `<p class="error">${invalid.map((i) => `${i.file.name}: ${i.reason}`).join(', ')}</p>`
+    errorEl.innerHTML = `<div class="error-msg">${invalid.map((i) => `${i.file.name}: ${i.reason}`).join(', ')}</div>`
   } else {
     errorEl.innerHTML = ''
   }
@@ -133,7 +132,6 @@ async function handleFiles(files: File[]) {
   createProgressBar(progressEl)
 
   let totalChunks = 0
-  let totalIndexed = 0
 
   for (const file of valid) {
     updateProgress(progressEl, { parse: 0, chunk: 0, indexCard: 0 })
@@ -153,18 +151,16 @@ async function handleFiles(files: File[]) {
     totalChunks += chunks.length
     updateProgress(progressEl, { parse: 100, chunk: 100, indexCard: 0 })
 
+    const chunksWithIds = await getAllChunks()
+    const docChunks = chunksWithIds.filter((c) => c.docId === docId)
+
     if (nanoSession) {
-      const chunksWithIds = await getAllChunks()
-      const docChunks = chunksWithIds.filter((c) => c.docId === docId)
       const cards = await generateIndexCardsBatch(nanoSession, docChunks, (current, total) => {
         const pct = Math.round((current / total) * 100)
         updateProgress(progressEl, { parse: 100, chunk: 100, indexCard: pct })
       })
       await persistIndexCards(cards)
-      totalIndexed += cards.size
     } else {
-      const chunksWithIds = await getAllChunks()
-      const docChunks = chunksWithIds.filter((c) => c.docId === docId)
       const fallbackCards = new Map()
       for (const chunk of docChunks) {
         if (chunk.id === undefined) continue
@@ -174,7 +170,6 @@ async function handleFiles(files: File[]) {
         })
       }
       await persistIndexCards(fallbackCards)
-      totalIndexed += fallbackCards.size
     }
 
     updateProgress(progressEl, { parse: 100, chunk: 100, indexCard: 100 })
@@ -190,7 +185,9 @@ async function handleFiles(files: File[]) {
   })
 
   refreshDocList()
-  progressEl.style.display = 'none'
+  setTimeout(() => {
+    progressEl.style.display = 'none'
+  }, 500)
 }
 
 async function handleAsk(question: string) {
@@ -200,12 +197,10 @@ async function handleAsk(question: string) {
 
   createAnswerView(answerEl)
   showLoading(answerEl)
-
-  console.log('handleAsk - nanoSession:', !!nanoSession)
+  citationsEl.innerHTML = ''
 
   try {
     const allChunks = await getAllChunks()
-    console.log('Total chunks in DB:', allChunks.length)
 
     if (allChunks.length === 0) {
       hideLoading(answerEl)
@@ -214,10 +209,7 @@ async function handleAsk(question: string) {
     }
 
     const candidateIds = shortlistCandidates(allChunks, question)
-    console.log('Candidate IDs:', candidateIds)
-
     const topKChunks = await loadTopKChunks(candidateIds.slice(0, 10))
-    console.log('Top K chunks loaded:', topKChunks.length)
 
     if (topKChunks.length === 0) {
       hideLoading(answerEl)
@@ -227,15 +219,11 @@ async function handleAsk(question: string) {
 
     let answer: string
     if (nanoSession) {
-      console.log('Using Nano LLM for answer...')
       const prompt = buildGroundedPrompt(topKChunks, question)
-      console.log('Prompt length:', prompt.length)
       answer = await nanoSession.prompt(prompt)
-      console.log('Nano answer received:', answer.substring(0, 100))
     } else {
-      console.log('Using fallback mode (no Nano)')
-      const summaries = topKChunks.map((c) => c.summary || c.text.slice(0, 200)).join('\n\n')
-      answer = `Based on keyword matching (Chrome AI not available):\n\n${summaries}\n\nTo enable AI answers, visit chrome://flags/#enable-built-in-ai and enable "Built-in AI".`
+      const context = topKChunks.map((c, i) => `[${i + 1}] ${c.summary || c.text.slice(0, 300)}`).join('\n\n')
+      answer = `Based on your documents:\n\n${context}\n\n(Chrome Built-in AI not available - showing summaries. Enable it at chrome://flags/#enable-built-in-ai)`
     }
 
     hideLoading(answerEl)
@@ -246,15 +234,16 @@ async function handleAsk(question: string) {
       const citedChunks = topKChunks.filter(
         (c) => c.id !== undefined && citations.some((ci) => ci.docId === c.docId && ci.ordinal === c.ordinal),
       )
-      renderCitationChips(citationsEl, citedChunks, {
-        onCitationClick: (chunk) => {
-          createChunkDrawer(drawerEl)
-          showChunkDrawer(drawerEl, chunk)
-        },
-      })
+      if (citedChunks.length > 0) {
+        renderCitationChips(citationsEl, citedChunks, {
+          onCitationClick: (chunk) => {
+            createChunkDrawer(drawerEl)
+            showChunkDrawer(drawerEl, chunk)
+          },
+        })
+      }
     }
   } catch (e) {
-    console.error('Error in handleAsk:', e)
     hideLoading(answerEl)
     setAnswer(answerEl, `Error: ${e instanceof Error ? e.message : String(e)}`)
   }
@@ -282,6 +271,7 @@ async function handleExport() {
   showExportConfirmation(exportEl)
 }
 
+// Initialize
 const dropzoneEl = document.querySelector('#dropzone-container') as HTMLElement
 createDropzone(dropzoneEl, { onFiles: handleFiles })
 
