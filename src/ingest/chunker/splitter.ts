@@ -16,12 +16,14 @@ export function chunkContent(
   let currentChunk = ''
   let currentHeadingPath = ''
   let ordinal = 0
+  let lastChunkText = ''
 
   for (const paragraph of paragraphs) {
     const headingMatch = paragraph.match(/^(#{1,6})\s+(.+)/)
     if (headingMatch) {
       if (currentChunk.trim()) {
         chunks.push(createChunk(docId, ordinal++, currentChunk, currentHeadingPath))
+        lastChunkText = currentChunk
         currentChunk = ''
       }
       currentHeadingPath = headingMatch[2].trim()
@@ -32,7 +34,9 @@ export function chunkContent(
 
     if (tokenEst > MAX_CHUNK_TOKENS && currentChunk.trim()) {
       chunks.push(createChunk(docId, ordinal++, currentChunk, currentHeadingPath))
-      currentChunk = paragraph
+      lastChunkText = currentChunk
+      const overlapText = getOverlapText(lastChunkText)
+      currentChunk = overlapText ? `${overlapText}\n\n${paragraph}` : paragraph
     } else {
       currentChunk = testChunk
     }
@@ -43,6 +47,19 @@ export function chunkContent(
   }
 
   return chunks
+}
+
+function getOverlapText(text: string): string {
+  const words = text.split(/\s+/)
+  const overlapWords: string[] = []
+  let tokenCount = 0
+
+  for (let i = words.length - 1; i >= 0 && tokenCount < OVERLAP_TOKENS; i--) {
+    overlapWords.unshift(words[i])
+    tokenCount++
+  }
+
+  return overlapWords.join(' ')
 }
 
 function createChunk(
