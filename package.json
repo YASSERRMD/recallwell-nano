@@ -1,6 +1,6 @@
 {
   "name": "recallwell-nano",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "On-device, vectorless knowledge-base Q&A in the browser",
   "type": "module",
   "scripts": {
