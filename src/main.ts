@@ -157,7 +157,7 @@ async function handleFiles(files: File[]) {
         if (chunk.id === undefined) continue
         fallbackCards.set(chunk.id, {
           summary: extractSummary(chunk.text),
-          keywords: extractKeywords(chunk.text).join(', '),
+          keywords: extractKeywords(chunk.text),
         })
       }
       await persistIndexCards(fallbackCards)
