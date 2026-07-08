@@ -1,5 +1,5 @@
-import { db } from './index'
-import type { Document } from './types'
+import { db } from '../index'
+import type { Document } from '../types'
 
 export async function addDocument(doc: Omit<Document, 'id' | 'ingestedAt'>): Promise<number> {
   return db.documents.add({
