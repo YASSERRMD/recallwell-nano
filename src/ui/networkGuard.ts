@@ -6,16 +6,22 @@ export function verifyZeroNetworkCalls(): boolean {
 
   let networkCalls = 0
 
-  window.fetch = function (...args) {
+  window.fetch = function (...args: Parameters<typeof fetch>) {
     networkCalls++
     console.warn('Network call detected:', args[0])
     return originalFetch.apply(this, args)
   }
 
-  XMLHttpRequest.prototype.open = function (...args) {
+  XMLHttpRequest.prototype.open = function (
+    method: string,
+    url: string | URL,
+    async?: boolean,
+    username?: string | null,
+    password?: string | null,
+  ) {
     networkCalls++
-    console.warn('XHR call detected:', args[1])
-    return originalXHROpen.apply(this, args)
+    console.warn('XHR call detected:', url)
+    return originalXHROpen.call(this, method, url, async ?? true, username, password)
   }
 
   setTimeout(() => {

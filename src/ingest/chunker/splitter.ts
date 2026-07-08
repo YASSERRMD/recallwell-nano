@@ -2,7 +2,6 @@ import type { Chunk } from '../../db/types'
 import { estimateTokens } from './tokenEstimator'
 import type { ParsedContent } from '../parsers'
 
-const MIN_CHUNK_TOKENS = 300
 const MAX_CHUNK_TOKENS = 500
 const OVERLAP_TOKENS = 50
 

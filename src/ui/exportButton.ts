@@ -14,7 +14,6 @@ export function createExportButton(
   `
 
   const btn = container.querySelector('#export-btn') as HTMLButtonElement
-  const confirmation = container.querySelector('#export-confirmation') as HTMLElement
 
   btn.addEventListener('click', async () => {
     btn.disabled = true

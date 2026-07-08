@@ -2,7 +2,7 @@ import { db } from '../db/index'
 import type { IndexCard } from './generator'
 
 export async function persistIndexCards(cards: Map<number, IndexCard>): Promise<void> {
-  const updates: Promise<void>[] = []
+  const updates: Promise<number>[] = []
 
   cards.forEach((card, chunkId) => {
     updates.push(

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { renderOfflineFallback } from '../ui/offlineFallback'
-import { captureInstallPrompt, isInstallable } from '../ui/installPrompt'
+import { isInstallable } from '../ui/installPrompt'
 
 describe('Offline fallback', () => {
   it('should render offline message', () => {

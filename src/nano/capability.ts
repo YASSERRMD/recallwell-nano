@@ -1,3 +1,5 @@
+import './types'
+
 export interface NanoCapability {
   available: boolean
   error?: string

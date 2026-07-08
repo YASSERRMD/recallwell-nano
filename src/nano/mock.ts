@@ -4,7 +4,7 @@ export function createMockSession(responses: string[] = []): NanoSession {
   let callCount = 0
 
   return {
-    prompt: async (input: string) => {
+    prompt: async (_input: string) => {
       const response = responses[callCount % responses.length] || 'Mock response'
       callCount++
       return response

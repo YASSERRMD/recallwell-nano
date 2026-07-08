@@ -14,5 +14,6 @@ export async function getAllChunks(): Promise<Chunk[]> {
 }
 
 export async function getChunksByIds(ids: number[]): Promise<Chunk[]> {
-  return db.chunks.bulkGet(ids)
+  const results = await db.chunks.bulkGet(ids)
+  return results.filter((c): c is Chunk => c !== undefined)
 }

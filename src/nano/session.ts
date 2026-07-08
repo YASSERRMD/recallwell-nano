@@ -1,3 +1,5 @@
+import './types'
+
 export interface NanoSession {
   prompt: (input: string) => Promise<string>
   destroy: () => void
