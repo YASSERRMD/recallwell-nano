@@ -35,5 +35,8 @@
     "vite": "^8.1.3",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "dexie": "^4.4.4"
   }
 }
