@@ -1,18 +1,14 @@
-import './types'
-
 export interface NanoSession {
   prompt: (input: string) => Promise<string>
   destroy: () => void
 }
 
-export async function createSession(systemPrompt?: string): Promise<NanoSession> {
-  if (!window.ai?.languageModel) {
+export async function createSession(): Promise<NanoSession> {
+  if (!('LanguageModel' in self)) {
     throw new Error('LanguageModel API not available')
   }
 
-  const session = await window.ai.languageModel.create({
-    systemPrompt: systemPrompt || 'You are a helpful assistant.',
-  })
+  const session = await LanguageModel.create()
 
   return {
     prompt: async (input: string) => {
