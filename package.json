@@ -40,7 +40,11 @@
   },
   "dependencies": {
     "@types/dom-chromium-ai": "^0.0.17",
+    "@types/marked": "^5.0.2",
+    "bootstrap": "^5.3.8",
+    "bootstrap-icons": "^1.13.1",
     "dexie": "^4.4.4",
+    "marked": "^18.0.5",
     "pdfjs-dist": "^6.1.200"
   }
 }
