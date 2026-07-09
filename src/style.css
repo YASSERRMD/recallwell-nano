@@ -182,6 +182,13 @@ body {
   margin-top: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid rgba(0,0,0,0.06);
+  align-items: center;
+}
+
+.citations-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .citation-chip {
