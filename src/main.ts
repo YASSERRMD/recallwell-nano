@@ -1,6 +1,6 @@
 import './style.css'
 import { detectCapability } from './nano/capability'
-import { createSession, type NanoSession } from './nano/session'
+import { createSession } from './nano/session'
 import { parse } from './ingest/parsers'
 import { chunkContent } from './ingest/chunker/splitter'
 import { generateIndexCardsBatch } from './index/batch'
@@ -19,8 +19,6 @@ import { computeContentHash } from './export/hash'
 import { compressData } from './export/compress'
 import { triggerDownload } from './export/download'
 import { validateFiles } from './ui/validation'
-
-let nanoSession: NanoSession | null = null
 
 interface ChatMessage {
   role: 'user' | 'ai'
@@ -257,22 +255,19 @@ async function handleAsk(question: string) {
     let answer: string
     let citations: Array<{ docId: number; ordinal: number }> = []
 
-    if (nanoSession) {
+    try {
+      console.log('[Query] Creating fresh Nano session...')
+      const querySession = await createSession()
       const prompt = buildGroundedPrompt(topKChunks, question)
-      answer = await nanoSession.prompt(prompt)
+      answer = await querySession.prompt(prompt)
       citations = parseCitations(answer)
-    } else {
-      try {
-        const session = await createSession()
-        nanoSession = session
-        const prompt = buildGroundedPrompt(topKChunks, question)
-        answer = await session.prompt(prompt)
-        citations = parseCitations(answer)
-      } catch {
-        const composed = composeAnswerWithCitations(topKChunks, question)
-        answer = composed.text
-        citations = composed.citations
-      }
+      querySession.destroy()
+      console.log('[Query] Done')
+    } catch (e) {
+      console.error('[Query] Nano failed, using fallback:', e)
+      const composed = composeAnswerWithCitations(topKChunks, question)
+      answer = composed.text
+      citations = composed.citations
     }
 
     hideTyping()
@@ -428,19 +423,12 @@ async function initNano() {
   const capability = await detectCapability()
 
   if (capability.available) {
-    try {
-      nanoSession = await createSession()
-      dot.className = 'status-dot online'
-      statusText.textContent = 'Online - AI ready'
-    } catch {
-      dot.className = 'status-dot offline'
-      statusText.textContent = 'Offline mode'
-      bannerArea.innerHTML = `<div class="banner banner-incapable">AI session failed. Running in keyword mode.</div>`
-    }
+    dot.className = 'status-dot online'
+    statusText.textContent = 'Online - AI ready'
   } else {
     dot.className = 'status-dot offline'
     statusText.textContent = 'Offline mode'
-    bannerArea.innerHTML = `<div class="banner banner-incapable">Enable AI: <code>chrome://flags/#enable-built-in-ai</code></div>`
+    bannerArea.innerHTML = `<div class="banner banner-incapable">Enable AI: <code>chrome://flags/#prompt-api-for-gemini-nano</code></div>`
   }
 }
 
