@@ -21,70 +21,76 @@ import { compressData } from './export/compress'
 import { triggerDownload } from './export/download'
 import { validateFiles } from './ui/validation'
 
-marked.setOptions({
-  breaks: true,
-  gfm: true,
-})
+marked.setOptions({ breaks: true, gfm: true })
 
 let nanoSession: NanoSession | null = null
-
-interface ChatMessage {
-  role: 'user' | 'ai'
-  text: string
-  citations?: Array<{ docId: number; ordinal: number }>
-}
-
-const messages: ChatMessage[] = []
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
 app.innerHTML = `
   <div class="app">
-    <div class="chat-header">
-      <div class="avatar">R</div>
-      <div class="header-info">
-        <h1>Recallwell</h1>
-        <p id="status-text">Checking AI...</p>
+    <header class="chat-header">
+      <div class="header-brand">
+        <div class="header-logo">R</div>
+        <span class="header-title">Recallwell</span>
       </div>
-      <div class="status-dot" id="status-dot"></div>
-    </div>
+      <div class="header-status">
+        <span class="status-indicator" id="status-dot"></span>
+        <span id="status-text">Checking...</span>
+      </div>
+    </header>
+
     <div id="banner-area"></div>
     <div class="stats-bar" id="stats-bar" style="display: none;">
-      <span><i class="bi bi-file-earmark-text"></i> <span id="stat-docs">0</span> docs</span>
+      <span><i class="bi bi-file-earmark-text"></i> <span id="stat-docs">0</span> documents</span>
       <span><i class="bi bi-grid-3x3-gap"></i> <span id="stat-chunks">0</span> chunks</span>
     </div>
-    <div class="chat-messages" id="chat-messages">
+
+    <main class="chat-messages" id="chat-messages">
       <div class="empty-chat" id="empty-state">
-        <div class="empty-chat-icon"><i class="bi bi-chat-dots"></i></div>
-        <h3>Ask anything</h3>
-        <p>I'll search your documents and answer using AI</p>
+        <div class="empty-chat-icon">
+          <i class="bi bi-stars"></i>
+        </div>
+        <h3>How can I help you?</h3>
+        <p>Ask questions about your documents. I'll find the relevant information and give you a grounded answer.</p>
+        <div class="empty-chat-hints">
+          <button class="hint-chip" data-q="What are the main topics?">What are the main topics?</button>
+          <button class="hint-chip" data-q="Summarize the documents">Summarize the documents</button>
+          <button class="hint-chip" data-q="Find key information">Find key information</button>
+        </div>
       </div>
-    </div>
-    <div class="chat-input-area">
+    </main>
+
+    <footer class="chat-input-area">
       <div class="ingest-trigger" id="ingest-trigger">
-        <i class="bi bi-cloud-arrow-up"></i> Drop files here or click to ingest
+        <i class="bi bi-plus-lg"></i>
+        <span>Add files</span>
         <input type="file" id="file-input" multiple accept=".txt,.md,.html,.pdf" hidden>
       </div>
       <div id="progress-area" class="progress-mini" style="display: none;"></div>
       <div id="doc-list-area" class="doc-list-mini"></div>
       <div class="input-wrapper">
-        <textarea class="chat-input" id="chat-input" placeholder="Ask a question..." rows="1"></textarea>
-        <button class="send-btn" id="send-btn">
-          <i class="bi bi-send-fill"></i>
+        <textarea class="chat-input" id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+        <button class="send-btn" id="send-btn" disabled>
+          <i class="bi bi-arrow-up"></i>
         </button>
       </div>
-    </div>
+    </footer>
+
     <div class="export-area">
-      <button class="export-btn" id="export-btn"><i class="bi bi-download"></i> Export Knowledge Base</button>
+      <button class="export-btn" id="export-btn">
+        <i class="bi bi-download"></i>
+        Export Knowledge Base
+      </button>
       <div id="export-msg"></div>
     </div>
   </div>
   <div id="drawer-container"></div>
 `
 
-// Elements
 const chatMessages = document.querySelector('#chat-messages') as HTMLElement
 const chatInput = document.querySelector('#chat-input') as HTMLTextAreaElement
+const sendBtn = document.querySelector('#send-btn') as HTMLButtonElement
 const emptyState = document.querySelector('#empty-state') as HTMLElement
 const bannerArea = document.querySelector('#banner-area') as HTMLElement
 const statsBar = document.querySelector('#stats-bar') as HTMLElement
@@ -94,11 +100,28 @@ const progressArea = document.querySelector('#progress-area') as HTMLElement
 const docListArea = document.querySelector('#doc-list-area') as HTMLElement
 const drawerContainer = document.querySelector('#drawer-container') as HTMLElement
 
+// Hint chips
+document.querySelectorAll('.hint-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    const q = chip.getAttribute('data-q')
+    if (q) {
+      chatInput.value = q
+      updateSendButton()
+      sendMessage()
+    }
+  })
+})
+
 // Auto-resize textarea
 chatInput.addEventListener('input', () => {
   chatInput.style.height = 'auto'
-  chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px'
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 150) + 'px'
+  updateSendButton()
 })
+
+function updateSendButton() {
+  sendBtn.disabled = !chatInput.value.trim()
+}
 
 // File ingest
 ingestTrigger.addEventListener('click', () => fileInput.click())
@@ -111,21 +134,21 @@ fileInput.addEventListener('change', () => {
 // Drag and drop
 ingestTrigger.addEventListener('dragover', (e) => {
   e.preventDefault()
-  ingestTrigger.classList.add('border-primary')
+  ingestTrigger.classList.add('dragging')
 })
 
 ingestTrigger.addEventListener('dragleave', () => {
-  ingestTrigger.classList.remove('border-primary')
+  ingestTrigger.classList.remove('dragging')
 })
 
 ingestTrigger.addEventListener('drop', (e) => {
   e.preventDefault()
-  ingestTrigger.classList.remove('border-primary')
+  ingestTrigger.classList.remove('dragging')
   const files = Array.from(e.dataTransfer?.files || [])
   if (files.length > 0) handleFiles(files)
 })
 
-// Chat submit — Enter sends, Shift+Enter makes newline
+// Enter sends, Shift+Enter newline
 chatInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
@@ -133,65 +156,68 @@ chatInput.addEventListener('keydown', (e) => {
   }
 })
 
-// Send button click
-document.querySelector('#send-btn')?.addEventListener('click', () => {
-  sendMessage()
-})
+sendBtn.addEventListener('click', sendMessage)
 
 function sendMessage() {
   const q = chatInput.value.trim()
-  if (q) {
-    handleAsk(q)
-    chatInput.value = ''
-    chatInput.style.height = 'auto'
-  }
+  if (!q) return
+  handleAsk(q)
+  chatInput.value = ''
+  chatInput.style.height = 'auto'
+  updateSendButton()
 }
 
-// Export
 document.querySelector('#export-btn')?.addEventListener('click', handleExport)
 
 function scrollToBottom() {
-  chatMessages.scrollTop = chatMessages.scrollHeight
+  requestAnimationFrame(() => {
+    chatMessages.scrollTop = chatMessages.scrollHeight
+  })
 }
 
 function renderMarkdown(text: string): string {
-  const cleanText = text.replace(/\d+#\d+/g, '').replace(/\s{2,}/g, ' ').trim()
-  return marked.parse(cleanText) as string
+  const clean = text.replace(/\d+#\d+/g, '').replace(/\s{2,}/g, ' ').trim()
+  return marked.parse(clean) as string
+}
+
+function formatTime(): string {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 function addMessage(role: 'user' | 'ai', text: string, citations?: Array<{ docId: number; ordinal: number }>) {
-  messages.push({ role, text, citations })
-
   if (emptyState) emptyState.remove()
 
   const msgEl = document.createElement('div')
   msgEl.className = `message message-${role}`
 
-  const avatarIcon = role === 'user' ? 'bi-person-fill' : 'bi-robot'
-
-  const renderedContent = role === 'ai' ? renderMarkdown(text) : escapeHtml(text)
+  const avatarIcon = role === 'user' ? 'bi-person-fill' : 'bi-stars'
+  const name = role === 'user' ? 'You' : 'Recallwell'
+  const content = role === 'ai' ? renderMarkdown(text) : escapeHtml(text)
 
   let citationsHtml = ''
   if (citations && citations.length > 0) {
     citationsHtml = `
       <div class="citations-row">
         <span class="citations-label">Sources</span>
-        ${citations.map((c) => `<button class="citation-chip" data-doc="${c.docId}" data-ord="${c.ordinal}"><i class="bi bi-file-earmark-text"></i> Doc ${c.docId} #${c.ordinal}</button>`).join('')}
+        ${citations.map((c) => `<button class="citation-chip" data-doc="${c.docId}" data-ord="${c.ordinal}"><i class="bi bi-file-earmark-text"></i>${c.docId}#${c.ordinal}</button>`).join('')}
       </div>
     `
   }
 
   msgEl.innerHTML = `
     <div class="msg-avatar"><i class="bi ${avatarIcon}"></i></div>
-    <div>
-      <div class="bubble">${renderedContent}${citationsHtml}</div>
+    <div class="msg-content">
+      <div class="msg-header">
+        <span class="msg-name">${name}</span>
+        <span class="msg-time">${formatTime()}</span>
+      </div>
+      <div class="bubble">${content}${citationsHtml}</div>
     </div>
   `
 
   chatMessages.appendChild(msgEl)
   scrollToBottom()
 
-  // Citation click handlers
   msgEl.querySelectorAll('.citation-chip').forEach((chip) => {
     chip.addEventListener('click', async () => {
       const docId = parseInt(chip.getAttribute('data-doc') || '0')
@@ -208,12 +234,17 @@ function showTyping() {
   typingEl.className = 'message message-ai'
   typingEl.id = 'typing'
   typingEl.innerHTML = `
-    <div class="msg-avatar"><i class="bi bi-robot"></i></div>
-    <div class="bubble">
-      <div class="typing-indicator">
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
+    <div class="msg-avatar"><i class="bi bi-stars"></i></div>
+    <div class="msg-content">
+      <div class="msg-header">
+        <span class="msg-name">Recallwell</span>
+      </div>
+      <div class="bubble">
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
       </div>
     </div>
   `
@@ -230,7 +261,7 @@ function showDrawer(chunk: { docId: number; ordinal: number; text: string }) {
     <div class="drawer-overlay" id="drawer-overlay">
       <div class="drawer">
         <div class="drawer-header">
-          <span class="drawer-title"><i class="bi bi-file-earmark-text"></i> Source: Doc ${chunk.docId} #${chunk.ordinal}</span>
+          <span class="drawer-title"><i class="bi bi-file-earmark-text"></i> Doc ${chunk.docId} #${chunk.ordinal}</span>
           <button class="drawer-close" id="close-drawer"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="drawer-content">${escapeHtml(chunk.text)}</div>
@@ -256,7 +287,7 @@ async function handleAsk(question: string) {
 
     if (allChunks.length === 0) {
       hideTyping()
-      addMessage('ai', 'No documents ingested yet. Drop some files using the button above to get started!')
+      addMessage('ai', 'No documents ingested yet. Click **Add files** above to get started.')
       return
     }
 
@@ -357,7 +388,7 @@ async function handleFiles(files: File[]) {
     contentHash: '',
   })
 
-  addMessage('ai', `Ingested ${valid.length} file(s) (${totalChunks} chunks). Ask me anything!`)
+  addMessage('ai', `Done! Ingested **${valid.length}** file(s) with **${totalChunks}** chunks. Ask me anything about your documents.`)
   updateStats()
   refreshDocList()
 
@@ -405,7 +436,7 @@ async function handleExport() {
   const blob = await compressData(JSON.stringify(snapshot))
   triggerDownload(blob, `recallwell-nano-${Date.now()}.rwkb.json.gz`)
   const msg = document.querySelector('#export-msg') as HTMLElement
-  msg.innerHTML = `<div class="export-success"><i class="bi bi-check-circle"></i> Exported! Check downloads.</div>`
+  msg.innerHTML = `<div class="export-success"><i class="bi bi-check-circle-fill"></i> Exported successfully</div>`
   setTimeout(() => { msg.innerHTML = '' }, 3000)
 }
 
@@ -418,17 +449,17 @@ async function initNano() {
   if (capability.available) {
     try {
       nanoSession = await createSession()
-      dot.className = 'status-dot online'
-      statusText.textContent = 'Online - AI ready'
+      dot.className = 'status-indicator online'
+      statusText.textContent = 'AI Ready'
     } catch {
-      dot.className = 'status-dot offline'
-      statusText.textContent = 'Offline mode'
-      bannerArea.innerHTML = `<div class="banner banner-incapable"><i class="bi bi-exclamation-triangle"></i> AI session failed. Running in keyword mode.</div>`
+      dot.className = 'status-indicator offline'
+      statusText.textContent = 'Keyword Mode'
+      bannerArea.innerHTML = `<div class="banner banner-incapable"><i class="bi bi-exclamation-triangle-fill"></i> AI session failed. Using keyword matching.</div>`
     }
   } else {
-    dot.className = 'status-dot offline'
-    statusText.textContent = 'Offline mode'
-    bannerArea.innerHTML = `<div class="banner banner-incapable"><i class="bi bi-exclamation-triangle"></i> Enable AI: <code>chrome://flags/#prompt-api-for-gemini-nano</code></div>`
+    dot.className = 'status-indicator offline'
+    statusText.textContent = 'Keyword Mode'
+    bannerArea.innerHTML = `<div class="banner banner-incapable"><i class="bi bi-exclamation-triangle-fill"></i> Enable AI: <code>chrome://flags/#prompt-api-for-gemini-nano</code></div>`
   }
 }
 
