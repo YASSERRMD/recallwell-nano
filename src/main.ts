@@ -29,76 +29,127 @@ const app = document.querySelector<HTMLDivElement>('#app')!
 
 app.innerHTML = `
   <div class="app">
-    <header class="chat-header">
-      <div class="header-brand">
-        <div class="header-logo">R</div>
-        <span class="header-title">Recallwell</span>
-      </div>
-      <div class="header-status">
-        <span class="status-indicator" id="status-dot"></span>
-        <span id="status-text">Checking...</span>
-      </div>
-    </header>
-
-    <div id="banner-area"></div>
-    <div class="stats-bar" id="stats-bar" style="display: none;">
-      <span><i class="bi bi-file-earmark-text"></i> <span id="stat-docs">0</span> documents</span>
-      <span><i class="bi bi-grid-3x3-gap"></i> <span id="stat-chunks">0</span> chunks</span>
-    </div>
-
-    <main class="chat-messages" id="chat-messages">
-      <div class="empty-chat" id="empty-state">
-        <div class="empty-chat-icon">
-          <i class="bi bi-stars"></i>
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">R</div>
+          <div>
+            <div class="sidebar-title">Recallwell</div>
+            <div class="sidebar-subtitle">Knowledge Base</div>
+          </div>
         </div>
-        <h3>How can I help you?</h3>
-        <p>Ask questions about your documents. I'll find the relevant information and give you a grounded answer.</p>
-        <div class="empty-chat-hints">
-          <button class="hint-chip" data-q="What are the main topics?">What are the main topics?</button>
-          <button class="hint-chip" data-q="Summarize the documents">Summarize the documents</button>
-          <button class="hint-chip" data-q="Find key information">Find key information</button>
+        <div class="theme-toggle">
+          <button class="theme-btn active" data-theme="light">
+            <i class="bi bi-sun"></i> Light
+          </button>
+          <button class="theme-btn" data-theme="dark">
+            <i class="bi bi-moon"></i> Dark
+          </button>
+        </div>
+        <div class="sidebar-status">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Checking...</span>
+        </div>
+      </div>
+
+      <div class="sidebar-content">
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">Documents</div>
+          <div class="ingest-zone" id="ingest-zone">
+            <div class="ingest-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+            <div class="ingest-text">Drop files here</div>
+            <div class="ingest-hint">or click to browse</div>
+            <input type="file" id="file-input" multiple accept=".txt,.md,.html,.pdf" hidden>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="progress-section" id="progress-area" style="display: none;"></div>
+          <div class="doc-list" id="doc-list"></div>
+        </div>
+      </div>
+
+      <div class="sidebar-stats" id="stats-bar" style="display: none;">
+        <span><i class="bi bi-file-earmark-text"></i> <span id="stat-docs">0</span> docs</span>
+        <span><i class="bi bi-grid-3x3-gap"></i> <span id="stat-chunks">0</span> chunks</span>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="export-btn" id="export-btn">
+          <i class="bi bi-download"></i> Export
+        </button>
+        <div id="export-msg"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="chat-header">
+        <div>
+          <div class="chat-title">Chat</div>
+          <div class="chat-subtitle">Ask questions about your documents</div>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chat-messages">
+        <div class="empty-chat" id="empty-state">
+          <div class="empty-icon"><i class="bi bi-stars"></i></div>
+          <h3>How can I help you?</h3>
+          <p>Add documents in the sidebar, then ask questions. I'll find relevant information and give you grounded answers.</p>
+          <div class="hint-chips">
+            <button class="hint-chip" data-q="What are the main topics?">Main topics</button>
+            <button class="hint-chip" data-q="Summarize the content">Summarize</button>
+            <button class="hint-chip" data-q="Find key insights">Key insights</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <div class="input-container">
+          <div class="input-wrapper">
+            <textarea class="chat-input" id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+            <button class="send-btn" id="send-btn" disabled>
+              <i class="bi bi-arrow-up"></i>
+            </button>
+          </div>
         </div>
       </div>
     </main>
-
-    <footer class="chat-input-area">
-      <div class="ingest-trigger" id="ingest-trigger">
-        <i class="bi bi-plus-lg"></i>
-        <span>Add files</span>
-        <input type="file" id="file-input" multiple accept=".txt,.md,.html,.pdf" hidden>
-      </div>
-      <div id="progress-area" class="progress-mini" style="display: none;"></div>
-      <div id="doc-list-area" class="doc-list-mini"></div>
-      <div class="input-wrapper">
-        <textarea class="chat-input" id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-        <button class="send-btn" id="send-btn" disabled>
-          <i class="bi bi-arrow-up"></i>
-        </button>
-      </div>
-    </footer>
-
-    <div class="export-area">
-      <button class="export-btn" id="export-btn">
-        <i class="bi bi-download"></i>
-        Export Knowledge Base
-      </button>
-      <div id="export-msg"></div>
-    </div>
   </div>
   <div id="drawer-container"></div>
 `
 
+// Elements
 const chatMessages = document.querySelector('#chat-messages') as HTMLElement
 const chatInput = document.querySelector('#chat-input') as HTMLTextAreaElement
 const sendBtn = document.querySelector('#send-btn') as HTMLButtonElement
 const emptyState = document.querySelector('#empty-state') as HTMLElement
-const bannerArea = document.querySelector('#banner-area') as HTMLElement
-const statsBar = document.querySelector('#stats-bar') as HTMLElement
-const ingestTrigger = document.querySelector('#ingest-trigger') as HTMLElement
+const ingestZone = document.querySelector('#ingest-zone') as HTMLElement
 const fileInput = document.querySelector('#file-input') as HTMLInputElement
 const progressArea = document.querySelector('#progress-area') as HTMLElement
-const docListArea = document.querySelector('#doc-list-area') as HTMLElement
+const docList = document.querySelector('#doc-list') as HTMLElement
+const statsBar = document.querySelector('#stats-bar') as HTMLElement
 const drawerContainer = document.querySelector('#drawer-container') as HTMLElement
+
+// Theme toggle
+const savedTheme = localStorage.getItem('theme') || 'light'
+document.documentElement.setAttribute('data-theme', savedTheme)
+updateThemeButtons()
+
+document.querySelectorAll('.theme-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const theme = btn.getAttribute('data-theme') || 'light'
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+    updateThemeButtons()
+  })
+})
+
+function updateThemeButtons() {
+  const current = document.documentElement.getAttribute('data-theme')
+  document.querySelectorAll('.theme-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-theme') === current)
+  })
+}
 
 // Hint chips
 document.querySelectorAll('.hint-chip').forEach((chip) => {
@@ -124,7 +175,7 @@ function updateSendButton() {
 }
 
 // File ingest
-ingestTrigger.addEventListener('click', () => fileInput.click())
+ingestZone.addEventListener('click', () => fileInput.click())
 fileInput.addEventListener('change', () => {
   const files = Array.from(fileInput.files || [])
   if (files.length > 0) handleFiles(files)
@@ -132,18 +183,18 @@ fileInput.addEventListener('change', () => {
 })
 
 // Drag and drop
-ingestTrigger.addEventListener('dragover', (e) => {
+ingestZone.addEventListener('dragover', (e) => {
   e.preventDefault()
-  ingestTrigger.classList.add('dragging')
+  ingestZone.classList.add('dragging')
 })
 
-ingestTrigger.addEventListener('dragleave', () => {
-  ingestTrigger.classList.remove('dragging')
+ingestZone.addEventListener('dragleave', () => {
+  ingestZone.classList.remove('dragging')
 })
 
-ingestTrigger.addEventListener('drop', (e) => {
+ingestZone.addEventListener('drop', (e) => {
   e.preventDefault()
-  ingestTrigger.classList.remove('dragging')
+  ingestZone.classList.remove('dragging')
   const files = Array.from(e.dataTransfer?.files || [])
   if (files.length > 0) handleFiles(files)
 })
@@ -206,8 +257,8 @@ function addMessage(role: 'user' | 'ai', text: string, citations?: Array<{ docId
 
   msgEl.innerHTML = `
     <div class="msg-avatar"><i class="bi ${avatarIcon}"></i></div>
-    <div class="msg-content">
-      <div class="msg-header">
+    <div class="msg-body">
+      <div class="msg-meta">
         <span class="msg-name">${name}</span>
         <span class="msg-time">${formatTime()}</span>
       </div>
@@ -235,8 +286,8 @@ function showTyping() {
   typingEl.id = 'typing'
   typingEl.innerHTML = `
     <div class="msg-avatar"><i class="bi bi-stars"></i></div>
-    <div class="msg-content">
-      <div class="msg-header">
+    <div class="msg-body">
+      <div class="msg-meta">
         <span class="msg-name">Recallwell</span>
       </div>
       <div class="bubble">
@@ -287,7 +338,7 @@ async function handleAsk(question: string) {
 
     if (allChunks.length === 0) {
       hideTyping()
-      addMessage('ai', 'No documents ingested yet. Click **Add files** above to get started.')
+      addMessage('ai', 'No documents ingested yet. Add files in the sidebar to get started.')
       return
     }
 
@@ -335,9 +386,9 @@ async function handleFiles(files: File[]) {
 
   progressArea.style.display = 'block'
   progressArea.innerHTML = `
-    <div class="progress-item"><span class="progress-label">Parse</span><div class="progress"><div class="progress-fill" id="p-parse"></div></div><span class="progress-percent" id="pp-parse">0%</span></div>
-    <div class="progress-item"><span class="progress-label">Chunk</span><div class="progress"><div class="progress-fill" id="p-chunk"></div></div><span class="progress-percent" id="pp-chunk">0%</span></div>
-    <div class="progress-item"><span class="progress-label">Index</span><div class="progress"><div class="progress-fill" id="p-index"></div></div><span class="progress-percent" id="pp-index">0%</span></div>
+    <div class="progress-item"><span class="progress-label">Parse</span><div class="progress-bar"><div class="progress-fill" id="p-parse"></div></div><span class="progress-percent" id="pp-parse">0%</span></div>
+    <div class="progress-item"><span class="progress-label">Chunk</span><div class="progress-bar"><div class="progress-fill" id="p-chunk"></div></div><span class="progress-percent" id="pp-chunk">0%</span></div>
+    <div class="progress-item"><span class="progress-label">Index</span><div class="progress-bar"><div class="progress-fill" id="p-index"></div></div><span class="progress-percent" id="pp-index">0%</span></div>
   `
 
   const setP = (id: string, pct: number) => {
@@ -388,7 +439,7 @@ async function handleFiles(files: File[]) {
     contentHash: '',
   })
 
-  addMessage('ai', `Done! Ingested **${valid.length}** file(s) with **${totalChunks}** chunks. Ask me anything about your documents.`)
+  addMessage('ai', `Done! Ingested **${valid.length}** file(s) with **${totalChunks}** chunks.`)
   updateStats()
   refreshDocList()
 
@@ -406,17 +457,21 @@ async function updateStats() {
 async function refreshDocList() {
   const docs = await listDocuments()
   if (docs.length === 0) {
-    docListArea.innerHTML = ''
+    docList.innerHTML = ''
     return
   }
-  docListArea.innerHTML = docs.map((d) => `
-    <div class="doc-item-mini">
-      <span class="doc-name-mini"><i class="bi bi-file-earmark"></i> ${d.title}</span>
-      <button class="doc-delete-mini" data-id="${d.id}"><i class="bi bi-trash3"></i></button>
+  docList.innerHTML = docs.map((d) => `
+    <div class="doc-item">
+      <div class="doc-icon"><i class="bi bi-file-earmark-text"></i></div>
+      <div class="doc-info">
+        <div class="doc-name">${d.title}</div>
+        <div class="doc-meta">${d.mime || 'file'}</div>
+      </div>
+      <button class="doc-delete" data-id="${d.id}"><i class="bi bi-trash3"></i></button>
     </div>
   `).join('')
 
-  docListArea.querySelectorAll('.doc-delete-mini').forEach((btn) => {
+  docList.querySelectorAll('.doc-delete').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = parseInt(btn.getAttribute('data-id') || '0')
       if (id) { await deleteDocument(id); refreshDocList(); updateStats() }
@@ -436,7 +491,7 @@ async function handleExport() {
   const blob = await compressData(JSON.stringify(snapshot))
   triggerDownload(blob, `recallwell-nano-${Date.now()}.rwkb.json.gz`)
   const msg = document.querySelector('#export-msg') as HTMLElement
-  msg.innerHTML = `<div class="export-success"><i class="bi bi-check-circle-fill"></i> Exported successfully</div>`
+  msg.innerHTML = `<div class="export-success"><i class="bi bi-check-circle-fill"></i> Exported</div>`
   setTimeout(() => { msg.innerHTML = '' }, 3000)
 }
 
@@ -449,17 +504,15 @@ async function initNano() {
   if (capability.available) {
     try {
       nanoSession = await createSession()
-      dot.className = 'status-indicator online'
+      dot.className = 'status-dot online'
       statusText.textContent = 'AI Ready'
     } catch {
-      dot.className = 'status-indicator offline'
+      dot.className = 'status-dot offline'
       statusText.textContent = 'Keyword Mode'
-      bannerArea.innerHTML = `<div class="banner banner-incapable"><i class="bi bi-exclamation-triangle-fill"></i> AI session failed. Using keyword matching.</div>`
     }
   } else {
-    dot.className = 'status-indicator offline'
+    dot.className = 'status-dot offline'
     statusText.textContent = 'Keyword Mode'
-    bannerArea.innerHTML = `<div class="banner banner-incapable"><i class="bi bi-exclamation-triangle-fill"></i> Enable AI: <code>chrome://flags/#prompt-api-for-gemini-nano</code></div>`
   }
 }
 
