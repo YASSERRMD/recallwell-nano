@@ -3,7 +3,6 @@ import { detectCapability } from './nano/capability'
 import { createSession, type NanoSession } from './nano/session'
 import { parse } from './ingest/parsers'
 import { chunkContent } from './ingest/chunker/splitter'
-import { generateIndexCardsBatch } from './index/batch'
 import { persistIndexCards } from './index/persist'
 import { extractKeywords, extractSummary } from './index/fallback'
 import { listDocuments, addDocument, deleteDocument } from './db/repositories/document'
@@ -304,27 +303,32 @@ async function handleFiles(files: File[]) {
   let totalChunks = 0
 
   for (const file of valid) {
-    setP('parse', 0); setP('chunk', 0); setP('index', 0)
+    try {
+      setP('parse', 0); setP('chunk', 0); setP('index', 0)
 
-    const content = await parse(file)
-    setP('parse', 100)
+      console.log('[1/5] Parsing:', file.name)
+      const content = await parse(file)
+      setP('parse', 100)
+      console.log('[1/5] Done, text length:', content.text.length)
 
-    const docId = await addDocument({ title: file.name, source: file.name, mime: file.type, hash: '' })
-    const chunks = chunkContent(content, docId)
-    await bulkAddChunks(chunks)
-    totalChunks += chunks.length
-    setP('chunk', 100)
+      console.log('[2/5] Adding document...')
+      const docId = await addDocument({ title: file.name, source: file.name, mime: file.type, hash: '' })
+      console.log('[2/5] Doc ID:', docId)
 
-    const chunksWithIds = await getAllChunks()
-    const docChunks = chunksWithIds.filter((c) => c.docId === docId)
+      console.log('[3/5] Chunking...')
+      const chunks = chunkContent(content, docId)
+      console.log('[3/5] Chunks:', chunks.length)
 
-    if (nanoSession) {
-      const cards = await generateIndexCardsBatch(nanoSession, docChunks, () => {
-        // progress handled below
-      })
-      await persistIndexCards(cards)
-      setP('index', 100)
-    } else {
+      console.log('[4/5] Saving chunks...')
+      await bulkAddChunks(chunks)
+      totalChunks += chunks.length
+      setP('chunk', 100)
+      console.log('[4/5] Done')
+
+      console.log('[5/5] Indexing...')
+      const chunksWithIds = await getAllChunks()
+      const docChunks = chunksWithIds.filter((c) => c.docId === docId)
+
       const fc = new Map()
       for (const c of docChunks) {
         if (c.id === undefined) continue
@@ -332,6 +336,10 @@ async function handleFiles(files: File[]) {
       }
       await persistIndexCards(fc)
       setP('index', 100)
+      console.log('[5/5] Done')
+    } catch (e) {
+      console.error('[Ingest] Error processing', file.name, ':', e)
+      addMessage('ai', `Error processing ${file.name}: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
