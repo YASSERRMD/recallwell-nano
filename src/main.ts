@@ -1,4 +1,5 @@
 import './style.css'
+import { marked } from 'marked'
 import { detectCapability } from './nano/capability'
 import { createSession, type NanoSession } from './nano/session'
 import { parse } from './ingest/parsers'
@@ -19,6 +20,11 @@ import { computeContentHash } from './export/hash'
 import { compressData } from './export/compress'
 import { triggerDownload } from './export/download'
 import { validateFiles } from './ui/validation'
+
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+})
 
 let nanoSession: NanoSession | null = null
 
@@ -44,32 +50,32 @@ app.innerHTML = `
     </div>
     <div id="banner-area"></div>
     <div class="stats-bar" id="stats-bar" style="display: none;">
-      <span>📄 <span id="stat-docs">0</span> docs</span>
-      <span>📦 <span id="stat-chunks">0</span> chunks</span>
+      <span><i class="bi bi-file-earmark-text"></i> <span id="stat-docs">0</span> docs</span>
+      <span><i class="bi bi-grid-3x3-gap"></i> <span id="stat-chunks">0</span> chunks</span>
     </div>
     <div class="chat-messages" id="chat-messages">
       <div class="empty-chat" id="empty-state">
-        <div class="empty-chat-icon">💬</div>
+        <div class="empty-chat-icon"><i class="bi bi-chat-dots"></i></div>
         <h3>Ask anything</h3>
         <p>I'll search your documents and answer using AI</p>
       </div>
     </div>
     <div class="chat-input-area">
       <div class="ingest-trigger" id="ingest-trigger">
-        📎 Drop files here or click to ingest
+        <i class="bi bi-cloud-arrow-up"></i> Drop files here or click to ingest
         <input type="file" id="file-input" multiple accept=".txt,.md,.html,.pdf" hidden>
       </div>
       <div id="progress-area" class="progress-mini" style="display: none;"></div>
       <div id="doc-list-area" class="doc-list-mini"></div>
-      <form class="chat-input-form" id="chat-form">
+      <div class="input-wrapper">
         <textarea class="chat-input" id="chat-input" placeholder="Ask a question..." rows="1"></textarea>
-        <button type="submit" class="send-btn" id="send-btn">
-          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        <button class="send-btn" id="send-btn">
+          <i class="bi bi-send-fill"></i>
         </button>
-      </form>
+      </div>
     </div>
     <div class="export-area">
-      <button class="export-btn" id="export-btn">📤 Export Knowledge Base</button>
+      <button class="export-btn" id="export-btn"><i class="bi bi-download"></i> Export Knowledge Base</button>
       <div id="export-msg"></div>
     </div>
   </div>
@@ -105,16 +111,16 @@ fileInput.addEventListener('change', () => {
 // Drag and drop
 ingestTrigger.addEventListener('dragover', (e) => {
   e.preventDefault()
-  ingestTrigger.style.borderColor = 'var(--primary)'
+  ingestTrigger.classList.add('border-primary')
 })
 
 ingestTrigger.addEventListener('dragleave', () => {
-  ingestTrigger.style.borderColor = ''
+  ingestTrigger.classList.remove('border-primary')
 })
 
 ingestTrigger.addEventListener('drop', (e) => {
   e.preventDefault()
-  ingestTrigger.style.borderColor = ''
+  ingestTrigger.classList.remove('border-primary')
   const files = Array.from(e.dataTransfer?.files || [])
   if (files.length > 0) handleFiles(files)
 })
@@ -148,6 +154,11 @@ function scrollToBottom() {
   chatMessages.scrollTop = chatMessages.scrollHeight
 }
 
+function renderMarkdown(text: string): string {
+  const cleanText = text.replace(/\d+#\d+/g, '').replace(/\s{2,}/g, ' ').trim()
+  return marked.parse(cleanText) as string
+}
+
 function addMessage(role: 'user' | 'ai', text: string, citations?: Array<{ docId: number; ordinal: number }>) {
   messages.push({ role, text, citations })
 
@@ -156,25 +167,24 @@ function addMessage(role: 'user' | 'ai', text: string, citations?: Array<{ docId
   const msgEl = document.createElement('div')
   msgEl.className = `message message-${role}`
 
-  const avatarText = role === 'user' ? 'Y' : 'R'
+  const avatarIcon = role === 'user' ? 'bi-person-fill' : 'bi-robot'
 
-  // Strip citation references from answer text
-  let cleanText = text.replace(/\d+#\d+/g, '').replace(/\s{2,}/g, ' ').trim()
+  const renderedContent = role === 'ai' ? renderMarkdown(text) : escapeHtml(text)
 
   let citationsHtml = ''
   if (citations && citations.length > 0) {
     citationsHtml = `
       <div class="citations-row">
-        <span class="citations-label">Sources:</span>
-        ${citations.map((c) => `<button class="citation-chip" data-doc="${c.docId}" data-ord="${c.ordinal}">Doc ${c.docId} #${c.ordinal}</button>`).join('')}
+        <span class="citations-label">Sources</span>
+        ${citations.map((c) => `<button class="citation-chip" data-doc="${c.docId}" data-ord="${c.ordinal}"><i class="bi bi-file-earmark-text"></i> Doc ${c.docId} #${c.ordinal}</button>`).join('')}
       </div>
     `
   }
 
   msgEl.innerHTML = `
-    <div class="msg-avatar">${avatarText}</div>
+    <div class="msg-avatar"><i class="bi ${avatarIcon}"></i></div>
     <div>
-      <div class="bubble">${escapeHtml(cleanText)}${citationsHtml}</div>
+      <div class="bubble">${renderedContent}${citationsHtml}</div>
     </div>
   `
 
@@ -198,7 +208,7 @@ function showTyping() {
   typingEl.className = 'message message-ai'
   typingEl.id = 'typing'
   typingEl.innerHTML = `
-    <div class="msg-avatar">R</div>
+    <div class="msg-avatar"><i class="bi bi-robot"></i></div>
     <div class="bubble">
       <div class="typing-indicator">
         <div class="typing-dot"></div>
@@ -220,8 +230,8 @@ function showDrawer(chunk: { docId: number; ordinal: number; text: string }) {
     <div class="drawer-overlay" id="drawer-overlay">
       <div class="drawer">
         <div class="drawer-header">
-          <span class="drawer-title">Source: Doc ${chunk.docId} #${chunk.ordinal}</span>
-          <button class="drawer-close" id="close-drawer">&times;</button>
+          <span class="drawer-title"><i class="bi bi-file-earmark-text"></i> Source: Doc ${chunk.docId} #${chunk.ordinal}</span>
+          <button class="drawer-close" id="close-drawer"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="drawer-content">${escapeHtml(chunk.text)}</div>
       </div>
@@ -294,9 +304,9 @@ async function handleFiles(files: File[]) {
 
   progressArea.style.display = 'block'
   progressArea.innerHTML = `
-    <div class="progress-item"><span class="progress-label">Parse</span><div class="progress-bar"><div class="progress-fill" id="p-parse"></div></div><span class="progress-percent" id="pp-parse">0%</span></div>
-    <div class="progress-item"><span class="progress-label">Chunk</span><div class="progress-bar"><div class="progress-fill" id="p-chunk"></div></div><span class="progress-percent" id="pp-chunk">0%</span></div>
-    <div class="progress-item"><span class="progress-label">Index</span><div class="progress-bar"><div class="progress-fill" id="p-index"></div></div><span class="progress-percent" id="pp-index">0%</span></div>
+    <div class="progress-item"><span class="progress-label">Parse</span><div class="progress"><div class="progress-fill" id="p-parse"></div></div><span class="progress-percent" id="pp-parse">0%</span></div>
+    <div class="progress-item"><span class="progress-label">Chunk</span><div class="progress"><div class="progress-fill" id="p-chunk"></div></div><span class="progress-percent" id="pp-chunk">0%</span></div>
+    <div class="progress-item"><span class="progress-label">Index</span><div class="progress"><div class="progress-fill" id="p-index"></div></div><span class="progress-percent" id="pp-index">0%</span></div>
   `
 
   const setP = (id: string, pct: number) => {
@@ -324,9 +334,7 @@ async function handleFiles(files: File[]) {
     const docChunks = chunksWithIds.filter((c) => c.docId === docId)
 
     if (nanoSession) {
-      const cards = await generateIndexCardsBatch(nanoSession, docChunks, () => {
-        // progress handled below
-      })
+      const cards = await generateIndexCardsBatch(nanoSession, docChunks, () => {})
       await persistIndexCards(cards)
       setP('index', 100)
     } else {
@@ -372,8 +380,8 @@ async function refreshDocList() {
   }
   docListArea.innerHTML = docs.map((d) => `
     <div class="doc-item-mini">
-      <span class="doc-name-mini">${d.title}</span>
-      <button class="doc-delete-mini" data-id="${d.id}">✕</button>
+      <span class="doc-name-mini"><i class="bi bi-file-earmark"></i> ${d.title}</span>
+      <button class="doc-delete-mini" data-id="${d.id}"><i class="bi bi-trash3"></i></button>
     </div>
   `).join('')
 
@@ -397,7 +405,7 @@ async function handleExport() {
   const blob = await compressData(JSON.stringify(snapshot))
   triggerDownload(blob, `recallwell-nano-${Date.now()}.rwkb.json.gz`)
   const msg = document.querySelector('#export-msg') as HTMLElement
-  msg.innerHTML = `<div class="export-success">Exported! Check downloads.</div>`
+  msg.innerHTML = `<div class="export-success"><i class="bi bi-check-circle"></i> Exported! Check downloads.</div>`
   setTimeout(() => { msg.innerHTML = '' }, 3000)
 }
 
@@ -415,12 +423,12 @@ async function initNano() {
     } catch {
       dot.className = 'status-dot offline'
       statusText.textContent = 'Offline mode'
-      bannerArea.innerHTML = `<div class="banner banner-incapable">AI session failed. Running in keyword mode.</div>`
+      bannerArea.innerHTML = `<div class="banner banner-incapable"><i class="bi bi-exclamation-triangle"></i> AI session failed. Running in keyword mode.</div>`
     }
   } else {
     dot.className = 'status-dot offline'
     statusText.textContent = 'Offline mode'
-    bannerArea.innerHTML = `<div class="banner banner-incapable">Enable AI: <code>chrome://flags/#enable-built-in-ai</code></div>`
+    bannerArea.innerHTML = `<div class="banner banner-incapable"><i class="bi bi-exclamation-triangle"></i> Enable AI: <code>chrome://flags/#prompt-api-for-gemini-nano</code></div>`
   }
 }
 
