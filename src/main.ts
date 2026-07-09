@@ -132,12 +132,14 @@ const drawerContainer = document.querySelector('#drawer-container') as HTMLEleme
 
 // Theme toggle
 const savedTheme = localStorage.getItem('theme') || 'light'
+console.log('[Theme] Saved theme:', savedTheme)
 document.documentElement.setAttribute('data-theme', savedTheme)
 updateThemeButtons()
 
 document.querySelectorAll('.theme-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     const theme = btn.getAttribute('data-theme') || 'light'
+    console.log('[Theme] Switching to:', theme)
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
     updateThemeButtons()
@@ -175,9 +177,13 @@ function updateSendButton() {
 }
 
 // File ingest
-ingestZone.addEventListener('click', () => fileInput.click())
+ingestZone.addEventListener('click', (e) => {
+  e.stopPropagation()
+  fileInput.click()
+})
 fileInput.addEventListener('change', () => {
   const files = Array.from(fileInput.files || [])
+  console.log('[Ingest] Files selected:', files.length, files.map(f => f.name))
   if (files.length > 0) handleFiles(files)
   fileInput.value = ''
 })
@@ -381,8 +387,13 @@ async function handleAsk(question: string) {
 }
 
 async function handleFiles(files: File[]) {
+  console.log('[Ingest] handleFiles called with', files.length, 'files')
   const { valid } = validateFiles(files)
-  if (valid.length === 0) return
+  console.log('[Ingest] Valid files:', valid.length)
+  if (valid.length === 0) {
+    console.log('[Ingest] No valid files, returning')
+    return
+  }
 
   progressArea.style.display = 'block'
   progressArea.innerHTML = `
@@ -401,9 +412,11 @@ async function handleFiles(files: File[]) {
   let totalChunks = 0
 
   for (const file of valid) {
+    console.log('[Ingest] Processing file:', file.name)
     setP('parse', 0); setP('chunk', 0); setP('index', 0)
 
     const content = await parse(file)
+    console.log('[Ingest] Parsed content length:', content.text.length)
     setP('parse', 100)
 
     const docId = await addDocument({ title: file.name, source: file.name, mime: file.type, hash: '' })
