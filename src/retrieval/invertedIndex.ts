@@ -14,7 +14,7 @@ export function buildInvertedIndex(chunks: Chunk[]): InvertedIndex {
     if (chunk.id === undefined) continue
     chunkDocs.set(chunk.id, chunk)
 
-    const text = `${chunk.summary} ${chunk.keywords}`
+    const text = `${chunk.text} ${chunk.summary} ${chunk.keywords}`
     const tokens = tokenize(text)
 
     for (const token of tokens) {
