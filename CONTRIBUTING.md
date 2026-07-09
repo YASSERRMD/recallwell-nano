@@ -1,79 +1,25 @@
 # Contributing to Recallwell Nano
 
-## Git Identity
+Thanks for your interest in contributing! This guide will help you get started.
+
+## Getting Started
+
+1. Fork the repository
+2. Clone your fork
+3. Create a feature branch
+4. Make your changes
+5. Submit a pull request
 
 ```bash
-git config user.name "YASSERRMD"
-git config user.email "arafath.yasser@gmail.com"
+git clone https://github.com/YASSERRMD/recallwell-nano.git
+cd recallwell-nano
+npm install
 ```
 
-## Branching Strategy
-
-- One branch per phase: `phase-XX-short-slug`
-- Work on phase branch, then merge to main
-
-## Merge Policy
-
-**STRICT: No squash merges. Ever.**
-
-Every merge into `main` must be a real merge (`git merge --no-ff`) or a fast-forward that preserves every individual commit. The full atomic commit history must be reflected in `main`.
+## Development
 
 ```bash
-# Correct merge
-git checkout main
-git merge --no-ff phase-XX-slug -m "merge(phase-XX): Phase Title"
-
-# NEVER do this
-git merge --squash phase-XX-slug
-```
-
-## Commit Policy
-
-**Maximize atomicity.** Each commit equals one logical change:
-
-- One file
-- One function
-- One config change
-- One test
-- One fix
-
-### Commit Format
-
-```
-type(scope): summary
-```
-
-Types:
-- `feat` - New feature
-- `fix` - Bug fix
-- `chore` - Maintenance
-- `docs` - Documentation
-- `test` - Tests
-- `refactor` - Code restructuring
-- `style` - Formatting
-- `build` - Build system
-- `ci` - CI/CD
-
-### Examples
-
-```
-feat(db): add Document table type
-fix(chunk): handle empty heading path
-test(parse): add PDF fixture
-chore(lint): update eslint config
-```
-
-## Code Style
-
-- TypeScript strict mode
-- No em dash character anywhere
-- Use "explore" or "investigate" instead of "experience"
-- No `any` unless justified with comment
-
-## Development Workflow
-
-```bash
-# Start development
+# Start development server
 npm run dev
 
 # Run tests
@@ -84,23 +30,69 @@ npm run lint
 
 # Format
 npm run format
+
+# Type check
+npx tsc --noEmit
 ```
 
-## Phase Workflow
+## Branch Naming
 
-```bash
-# Create phase branch
-git checkout main
-git checkout -b phase-XX-slug
+Use descriptive branch names:
 
-# Make atomic commits
-git commit -m "feat(scope): description"
-git commit -m "feat(scope): another change"
+- `feat/add-new-feature`
+- `fix/resolve-issue`
+- `docs/update-readme`
+- `refactor/improve-code`
 
-# Merge to main
-git checkout main
-git merge --no-ff phase-XX-slug -m "merge(phase-XX): Phase Title"
+## Commit Messages
 
-# Delete phase branch
-git branch -d phase-XX-slug
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
 ```
+type(scope): description
+```
+
+Types:
+- `feat` — New feature
+- `fix` — Bug fix
+- `docs` — Documentation
+- `style` — Formatting (no code change)
+- `refactor` — Code restructuring
+- `test` — Adding tests
+- `chore` — Maintenance
+
+Examples:
+```
+feat(chunk): add heading-aware splitting
+fix(nano): handle session creation failure
+docs: update browser requirements
+test: add chunker unit tests
+```
+
+## Code Style
+
+- TypeScript strict mode
+- ESLint + Prettier for formatting
+- No `any` without documented justification
+- Write tests for new features
+
+## Pull Requests
+
+1. Keep PRs focused on a single change
+2. Write a clear description
+3. Include screenshots for UI changes
+4. Ensure all tests pass
+5. Request a review
+
+## Reporting Issues
+
+Use GitHub Issues with:
+
+- Clear title
+- Steps to reproduce
+- Expected vs actual behavior
+- Browser/OS information
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.
