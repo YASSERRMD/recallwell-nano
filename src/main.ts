@@ -12,7 +12,6 @@ import { upsertManifest, getManifest } from './db/repositories/manifest'
 import { shortlistCandidates } from './retrieval/shortlist'
 import { loadTopKChunks } from './answer/loadChunks'
 import { buildGroundedPrompt } from './answer/prompt'
-import { composeAnswerWithCitations } from './answer/composer'
 import { parseCitations } from './answer/citations'
 import { serializeSnapshot } from './export/serialize'
 import { computeContentHash } from './export/hash'
@@ -255,19 +254,26 @@ async function handleAsk(question: string) {
     let answer: string
     let citations: Array<{ docId: number; ordinal: number }> = []
 
+    // Step 1: Retrieve chunks from local IndexedDB (already done above)
+    console.log('[Query] Retrieved', topKChunks.length, 'relevant chunks from local store')
+
+    // Step 2: Send chunks as context to Gemini Nano for answer
     try {
       console.log('[Query] Creating fresh Nano session...')
       const querySession = await createSession()
+      console.log('[Query] Session created, sending chunks to Nano...')
       const prompt = buildGroundedPrompt(topKChunks, question)
+      console.log('[Query] Prompt length:', prompt.length, 'chars')
       answer = await querySession.prompt(prompt)
+      console.log('[Query] Nano responded, length:', answer.length)
       citations = parseCitations(answer)
       querySession.destroy()
       console.log('[Query] Done')
     } catch (e) {
-      console.error('[Query] Nano failed, using fallback:', e)
-      const composed = composeAnswerWithCitations(topKChunks, question)
-      answer = composed.text
-      citations = composed.citations
+      console.error('[Query] Nano failed:', e)
+      hideTyping()
+      addMessage('ai', `Gemini Nano error: ${e instanceof Error ? e.message : String(e)}. Make sure Chrome AI is enabled at chrome://flags/#prompt-api-for-gemini-nano`)
+      return
     }
 
     hideTyping()
