@@ -78,7 +78,6 @@ app.innerHTML = `
 
 // Elements
 const chatMessages = document.querySelector('#chat-messages') as HTMLElement
-const chatForm = document.querySelector('#chat-form') as HTMLFormElement
 const chatInput = document.querySelector('#chat-input') as HTMLTextAreaElement
 const emptyState = document.querySelector('#empty-state') as HTMLElement
 const bannerArea = document.querySelector('#banner-area') as HTMLElement
@@ -120,16 +119,27 @@ ingestTrigger.addEventListener('drop', (e) => {
   if (files.length > 0) handleFiles(files)
 })
 
-// Chat submit
-chatForm.addEventListener('submit', (e) => {
-  e.preventDefault()
+// Chat submit — Enter sends, Shift+Enter makes newline
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    sendMessage()
+  }
+})
+
+// Send button click
+document.querySelector('#send-btn')?.addEventListener('click', () => {
+  sendMessage()
+})
+
+function sendMessage() {
   const q = chatInput.value.trim()
   if (q) {
     handleAsk(q)
     chatInput.value = ''
     chatInput.style.height = 'auto'
   }
-})
+}
 
 // Export
 document.querySelector('#export-btn')?.addEventListener('click', handleExport)
