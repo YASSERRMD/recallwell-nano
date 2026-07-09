@@ -1,5 +1,4 @@
 import './style.css'
-import { marked } from 'marked'
 import { detectCapability } from './nano/capability'
 import { createSession, type NanoSession } from './nano/session'
 import { parse } from './ingest/parsers'
@@ -21,99 +20,58 @@ import { compressData } from './export/compress'
 import { triggerDownload } from './export/download'
 import { validateFiles } from './ui/validation'
 
-marked.setOptions({ breaks: true, gfm: true })
-
 let nanoSession: NanoSession | null = null
+
+interface ChatMessage {
+  role: 'user' | 'ai'
+  text: string
+  citations?: Array<{ docId: number; ordinal: number }>
+}
+
+const messages: ChatMessage[] = []
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
 app.innerHTML = `
   <div class="app">
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <div class="sidebar-brand">
-          <div class="sidebar-logo">R</div>
-          <div>
-            <div class="sidebar-title">Recallwell</div>
-            <div class="sidebar-subtitle">Knowledge Base</div>
-          </div>
-        </div>
-        <div class="theme-toggle">
-          <button class="theme-btn active" data-theme="light">
-            <i class="bi bi-sun"></i> Light
-          </button>
-          <button class="theme-btn" data-theme="dark">
-            <i class="bi bi-moon"></i> Dark
-          </button>
-        </div>
-        <div class="sidebar-status">
-          <span class="status-dot" id="status-dot"></span>
-          <span id="status-text">Checking...</span>
-        </div>
+    <div class="chat-header">
+      <div class="avatar">R</div>
+      <div class="header-info">
+        <h1>Recallwell</h1>
+        <p id="status-text">Checking AI...</p>
       </div>
-
-      <div class="sidebar-content">
-        <div class="sidebar-section">
-          <div class="sidebar-section-title">Documents</div>
-          <div class="ingest-zone" id="ingest-zone">
-            <div class="ingest-icon"><i class="bi bi-cloud-arrow-up"></i></div>
-            <div class="ingest-text">Drop files here</div>
-            <div class="ingest-hint">or click to browse</div>
-            <input type="file" id="file-input" multiple accept=".txt,.md,.html,.pdf" hidden>
-          </div>
-        </div>
-
-        <div class="sidebar-section">
-          <div class="progress-section" id="progress-area" style="display: none;"></div>
-          <div class="doc-list" id="doc-list"></div>
-        </div>
+      <div class="status-dot" id="status-dot"></div>
+    </div>
+    <div id="banner-area"></div>
+    <div class="stats-bar" id="stats-bar" style="display: none;">
+      <span>📄 <span id="stat-docs">0</span> docs</span>
+      <span>📦 <span id="stat-chunks">0</span> chunks</span>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="empty-chat" id="empty-state">
+        <div class="empty-chat-icon">💬</div>
+        <h3>Ask anything</h3>
+        <p>I'll search your documents and answer using AI</p>
       </div>
-
-      <div class="sidebar-stats" id="stats-bar" style="display: none;">
-        <span><i class="bi bi-file-earmark-text"></i> <span id="stat-docs">0</span> docs</span>
-        <span><i class="bi bi-grid-3x3-gap"></i> <span id="stat-chunks">0</span> chunks</span>
+    </div>
+    <div class="chat-input-area">
+      <div class="ingest-trigger" id="ingest-trigger">
+        📎 Drop files here or click to ingest
+        <input type="file" id="file-input" multiple accept=".txt,.md,.html,.pdf" hidden>
       </div>
-
-      <div class="sidebar-footer">
-        <button class="export-btn" id="export-btn">
-          <i class="bi bi-download"></i> Export
+      <div id="progress-area" class="progress-mini" style="display: none;"></div>
+      <div id="doc-list-area" class="doc-list-mini"></div>
+      <form class="chat-input-form" id="chat-form">
+        <textarea class="chat-input" id="chat-input" placeholder="Ask a question..." rows="1"></textarea>
+        <button type="submit" class="send-btn" id="send-btn">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         </button>
-        <div id="export-msg"></div>
-      </div>
-    </aside>
-
-    <main class="main">
-      <div class="chat-header">
-        <div>
-          <div class="chat-title">Chat</div>
-          <div class="chat-subtitle">Ask questions about your documents</div>
-        </div>
-      </div>
-
-      <div class="chat-messages" id="chat-messages">
-        <div class="empty-chat" id="empty-state">
-          <div class="empty-icon"><i class="bi bi-stars"></i></div>
-          <h3>How can I help you?</h3>
-          <p>Add documents in the sidebar, then ask questions. I'll find relevant information and give you grounded answers.</p>
-          <div class="hint-chips">
-            <button class="hint-chip" data-q="What are the main topics?">Main topics</button>
-            <button class="hint-chip" data-q="Summarize the content">Summarize</button>
-            <button class="hint-chip" data-q="Find key insights">Key insights</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="chat-input-area">
-        <div class="input-container">
-          <div class="input-wrapper">
-            <textarea class="chat-input" id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-            <button class="send-btn" id="send-btn" disabled>
-              <i class="bi bi-arrow-up"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-    </main>
+      </form>
+    </div>
+    <div class="export-area">
+      <button class="export-btn" id="export-btn">📤 Export Knowledge Base</button>
+      <div id="export-msg"></div>
+    </div>
   </div>
   <div id="drawer-container"></div>
 `
@@ -121,91 +79,47 @@ app.innerHTML = `
 // Elements
 const chatMessages = document.querySelector('#chat-messages') as HTMLElement
 const chatInput = document.querySelector('#chat-input') as HTMLTextAreaElement
-const sendBtn = document.querySelector('#send-btn') as HTMLButtonElement
 const emptyState = document.querySelector('#empty-state') as HTMLElement
-const ingestZone = document.querySelector('#ingest-zone') as HTMLElement
+const bannerArea = document.querySelector('#banner-area') as HTMLElement
+const statsBar = document.querySelector('#stats-bar') as HTMLElement
+const ingestTrigger = document.querySelector('#ingest-trigger') as HTMLElement
 const fileInput = document.querySelector('#file-input') as HTMLInputElement
 const progressArea = document.querySelector('#progress-area') as HTMLElement
-const docList = document.querySelector('#doc-list') as HTMLElement
-const statsBar = document.querySelector('#stats-bar') as HTMLElement
+const docListArea = document.querySelector('#doc-list-area') as HTMLElement
 const drawerContainer = document.querySelector('#drawer-container') as HTMLElement
-
-// Theme toggle
-const savedTheme = localStorage.getItem('theme') || 'light'
-console.log('[Theme] Saved theme:', savedTheme)
-document.documentElement.setAttribute('data-theme', savedTheme)
-updateThemeButtons()
-
-document.querySelectorAll('.theme-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const theme = btn.getAttribute('data-theme') || 'light'
-    console.log('[Theme] Switching to:', theme)
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('theme', theme)
-    updateThemeButtons()
-  })
-})
-
-function updateThemeButtons() {
-  const current = document.documentElement.getAttribute('data-theme')
-  document.querySelectorAll('.theme-btn').forEach((btn) => {
-    btn.classList.toggle('active', btn.getAttribute('data-theme') === current)
-  })
-}
-
-// Hint chips
-document.querySelectorAll('.hint-chip').forEach((chip) => {
-  chip.addEventListener('click', () => {
-    const q = chip.getAttribute('data-q')
-    if (q) {
-      chatInput.value = q
-      updateSendButton()
-      sendMessage()
-    }
-  })
-})
 
 // Auto-resize textarea
 chatInput.addEventListener('input', () => {
   chatInput.style.height = 'auto'
-  chatInput.style.height = Math.min(chatInput.scrollHeight, 150) + 'px'
-  updateSendButton()
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px'
 })
-
-function updateSendButton() {
-  sendBtn.disabled = !chatInput.value.trim()
-}
 
 // File ingest
-ingestZone.addEventListener('click', (e) => {
-  e.stopPropagation()
-  fileInput.click()
-})
+ingestTrigger.addEventListener('click', () => fileInput.click())
 fileInput.addEventListener('change', () => {
   const files = Array.from(fileInput.files || [])
-  console.log('[Ingest] Files selected:', files.length, files.map(f => f.name))
   if (files.length > 0) handleFiles(files)
   fileInput.value = ''
 })
 
 // Drag and drop
-ingestZone.addEventListener('dragover', (e) => {
+ingestTrigger.addEventListener('dragover', (e) => {
   e.preventDefault()
-  ingestZone.classList.add('dragging')
+  ingestTrigger.style.borderColor = 'var(--primary)'
 })
 
-ingestZone.addEventListener('dragleave', () => {
-  ingestZone.classList.remove('dragging')
+ingestTrigger.addEventListener('dragleave', () => {
+  ingestTrigger.style.borderColor = ''
 })
 
-ingestZone.addEventListener('drop', (e) => {
+ingestTrigger.addEventListener('drop', (e) => {
   e.preventDefault()
-  ingestZone.classList.remove('dragging')
+  ingestTrigger.style.borderColor = ''
   const files = Array.from(e.dataTransfer?.files || [])
   if (files.length > 0) handleFiles(files)
 })
 
-// Enter sends, Shift+Enter newline
+// Chat submit — Enter sends, Shift+Enter makes newline
 chatInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
@@ -213,68 +127,56 @@ chatInput.addEventListener('keydown', (e) => {
   }
 })
 
-sendBtn.addEventListener('click', sendMessage)
+// Send button click
+document.querySelector('#send-btn')?.addEventListener('click', () => {
+  sendMessage()
+})
 
 function sendMessage() {
   const q = chatInput.value.trim()
-  if (!q) return
-  handleAsk(q)
-  chatInput.value = ''
-  chatInput.style.height = 'auto'
-  updateSendButton()
+  if (q) {
+    handleAsk(q)
+    chatInput.value = ''
+    chatInput.style.height = 'auto'
+  }
 }
 
+// Export
 document.querySelector('#export-btn')?.addEventListener('click', handleExport)
 
 function scrollToBottom() {
-  requestAnimationFrame(() => {
-    chatMessages.scrollTop = chatMessages.scrollHeight
-  })
-}
-
-function renderMarkdown(text: string): string {
-  const clean = text.replace(/\d+#\d+/g, '').replace(/\s{2,}/g, ' ').trim()
-  return marked.parse(clean) as string
-}
-
-function formatTime(): string {
-  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  chatMessages.scrollTop = chatMessages.scrollHeight
 }
 
 function addMessage(role: 'user' | 'ai', text: string, citations?: Array<{ docId: number; ordinal: number }>) {
+  messages.push({ role, text, citations })
+
   if (emptyState) emptyState.remove()
 
   const msgEl = document.createElement('div')
   msgEl.className = `message message-${role}`
 
-  const avatarIcon = role === 'user' ? 'bi-person-fill' : 'bi-stars'
-  const name = role === 'user' ? 'You' : 'Recallwell'
-  const content = role === 'ai' ? renderMarkdown(text) : escapeHtml(text)
-
+  const avatarText = role === 'user' ? 'Y' : 'R'
   let citationsHtml = ''
   if (citations && citations.length > 0) {
     citationsHtml = `
       <div class="citations-row">
-        <span class="citations-label">Sources</span>
-        ${citations.map((c) => `<button class="citation-chip" data-doc="${c.docId}" data-ord="${c.ordinal}"><i class="bi bi-file-earmark-text"></i>${c.docId}#${c.ordinal}</button>`).join('')}
+        ${citations.map((c) => `<button class="citation-chip" data-doc="${c.docId}" data-ord="${c.ordinal}">${c.docId}#${c.ordinal}</button>`).join('')}
       </div>
     `
   }
 
   msgEl.innerHTML = `
-    <div class="msg-avatar"><i class="bi ${avatarIcon}"></i></div>
-    <div class="msg-body">
-      <div class="msg-meta">
-        <span class="msg-name">${name}</span>
-        <span class="msg-time">${formatTime()}</span>
-      </div>
-      <div class="bubble">${content}${citationsHtml}</div>
+    <div class="msg-avatar">${avatarText}</div>
+    <div>
+      <div class="bubble">${escapeHtml(text)}${citationsHtml}</div>
     </div>
   `
 
   chatMessages.appendChild(msgEl)
   scrollToBottom()
 
+  // Citation click handlers
   msgEl.querySelectorAll('.citation-chip').forEach((chip) => {
     chip.addEventListener('click', async () => {
       const docId = parseInt(chip.getAttribute('data-doc') || '0')
@@ -291,17 +193,12 @@ function showTyping() {
   typingEl.className = 'message message-ai'
   typingEl.id = 'typing'
   typingEl.innerHTML = `
-    <div class="msg-avatar"><i class="bi bi-stars"></i></div>
-    <div class="msg-body">
-      <div class="msg-meta">
-        <span class="msg-name">Recallwell</span>
-      </div>
-      <div class="bubble">
-        <div class="typing-indicator">
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-        </div>
+    <div class="msg-avatar">R</div>
+    <div class="bubble">
+      <div class="typing-indicator">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
       </div>
     </div>
   `
@@ -318,8 +215,8 @@ function showDrawer(chunk: { docId: number; ordinal: number; text: string }) {
     <div class="drawer-overlay" id="drawer-overlay">
       <div class="drawer">
         <div class="drawer-header">
-          <span class="drawer-title"><i class="bi bi-file-earmark-text"></i> Doc ${chunk.docId} #${chunk.ordinal}</span>
-          <button class="drawer-close" id="close-drawer"><i class="bi bi-x-lg"></i></button>
+          <span class="drawer-title">Source: Doc ${chunk.docId} #${chunk.ordinal}</span>
+          <button class="drawer-close" id="close-drawer">&times;</button>
         </div>
         <div class="drawer-content">${escapeHtml(chunk.text)}</div>
       </div>
@@ -344,7 +241,7 @@ async function handleAsk(question: string) {
 
     if (allChunks.length === 0) {
       hideTyping()
-      addMessage('ai', 'No documents ingested yet. Add files in the sidebar to get started.')
+      addMessage('ai', 'No documents ingested yet. Drop some files using the button above to get started!')
       return
     }
 
@@ -387,13 +284,8 @@ async function handleAsk(question: string) {
 }
 
 async function handleFiles(files: File[]) {
-  console.log('[Ingest] handleFiles called with', files.length, 'files')
   const { valid } = validateFiles(files)
-  console.log('[Ingest] Valid files:', valid.length)
-  if (valid.length === 0) {
-    console.log('[Ingest] No valid files, returning')
-    return
-  }
+  if (valid.length === 0) return
 
   progressArea.style.display = 'block'
   progressArea.innerHTML = `
@@ -412,11 +304,9 @@ async function handleFiles(files: File[]) {
   let totalChunks = 0
 
   for (const file of valid) {
-    console.log('[Ingest] Processing file:', file.name)
     setP('parse', 0); setP('chunk', 0); setP('index', 0)
 
     const content = await parse(file)
-    console.log('[Ingest] Parsed content length:', content.text.length)
     setP('parse', 100)
 
     const docId = await addDocument({ title: file.name, source: file.name, mime: file.type, hash: '' })
@@ -429,7 +319,9 @@ async function handleFiles(files: File[]) {
     const docChunks = chunksWithIds.filter((c) => c.docId === docId)
 
     if (nanoSession) {
-      const cards = await generateIndexCardsBatch(nanoSession, docChunks, () => {})
+      const cards = await generateIndexCardsBatch(nanoSession, docChunks, () => {
+        // progress handled below
+      })
       await persistIndexCards(cards)
       setP('index', 100)
     } else {
@@ -452,7 +344,7 @@ async function handleFiles(files: File[]) {
     contentHash: '',
   })
 
-  addMessage('ai', `Done! Ingested **${valid.length}** file(s) with **${totalChunks}** chunks.`)
+  addMessage('ai', `Ingested ${valid.length} file(s) (${totalChunks} chunks). Ask me anything!`)
   updateStats()
   refreshDocList()
 
@@ -470,21 +362,17 @@ async function updateStats() {
 async function refreshDocList() {
   const docs = await listDocuments()
   if (docs.length === 0) {
-    docList.innerHTML = ''
+    docListArea.innerHTML = ''
     return
   }
-  docList.innerHTML = docs.map((d) => `
-    <div class="doc-item">
-      <div class="doc-icon"><i class="bi bi-file-earmark-text"></i></div>
-      <div class="doc-info">
-        <div class="doc-name">${d.title}</div>
-        <div class="doc-meta">${d.mime || 'file'}</div>
-      </div>
-      <button class="doc-delete" data-id="${d.id}"><i class="bi bi-trash3"></i></button>
+  docListArea.innerHTML = docs.map((d) => `
+    <div class="doc-item-mini">
+      <span class="doc-name-mini">${d.title}</span>
+      <button class="doc-delete-mini" data-id="${d.id}">✕</button>
     </div>
   `).join('')
 
-  docList.querySelectorAll('.doc-delete').forEach((btn) => {
+  docListArea.querySelectorAll('.doc-delete-mini').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = parseInt(btn.getAttribute('data-id') || '0')
       if (id) { await deleteDocument(id); refreshDocList(); updateStats() }
@@ -504,7 +392,7 @@ async function handleExport() {
   const blob = await compressData(JSON.stringify(snapshot))
   triggerDownload(blob, `recallwell-nano-${Date.now()}.rwkb.json.gz`)
   const msg = document.querySelector('#export-msg') as HTMLElement
-  msg.innerHTML = `<div class="export-success"><i class="bi bi-check-circle-fill"></i> Exported</div>`
+  msg.innerHTML = `<div class="export-success">Exported! Check downloads.</div>`
   setTimeout(() => { msg.innerHTML = '' }, 3000)
 }
 
@@ -518,14 +406,16 @@ async function initNano() {
     try {
       nanoSession = await createSession()
       dot.className = 'status-dot online'
-      statusText.textContent = 'AI Ready'
+      statusText.textContent = 'Online - AI ready'
     } catch {
       dot.className = 'status-dot offline'
-      statusText.textContent = 'Keyword Mode'
+      statusText.textContent = 'Offline mode'
+      bannerArea.innerHTML = `<div class="banner banner-incapable">AI session failed. Running in keyword mode.</div>`
     }
   } else {
     dot.className = 'status-dot offline'
-    statusText.textContent = 'Keyword Mode'
+    statusText.textContent = 'Offline mode'
+    bannerArea.innerHTML = `<div class="banner banner-incapable">Enable AI: <code>chrome://flags/#enable-built-in-ai</code></div>`
   }
 }
 
