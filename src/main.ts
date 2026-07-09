@@ -157,11 +157,16 @@ function addMessage(role: 'user' | 'ai', text: string, citations?: Array<{ docId
   msgEl.className = `message message-${role}`
 
   const avatarText = role === 'user' ? 'Y' : 'R'
+
+  // Strip citation references from answer text
+  let cleanText = text.replace(/\d+#\d+/g, '').replace(/\s{2,}/g, ' ').trim()
+
   let citationsHtml = ''
   if (citations && citations.length > 0) {
     citationsHtml = `
       <div class="citations-row">
-        ${citations.map((c) => `<button class="citation-chip" data-doc="${c.docId}" data-ord="${c.ordinal}">${c.docId}#${c.ordinal}</button>`).join('')}
+        <span class="citations-label">Sources:</span>
+        ${citations.map((c) => `<button class="citation-chip" data-doc="${c.docId}" data-ord="${c.ordinal}">Doc ${c.docId} #${c.ordinal}</button>`).join('')}
       </div>
     `
   }
@@ -169,7 +174,7 @@ function addMessage(role: 'user' | 'ai', text: string, citations?: Array<{ docId
   msgEl.innerHTML = `
     <div class="msg-avatar">${avatarText}</div>
     <div>
-      <div class="bubble">${escapeHtml(text)}${citationsHtml}</div>
+      <div class="bubble">${escapeHtml(cleanText)}${citationsHtml}</div>
     </div>
   `
 
