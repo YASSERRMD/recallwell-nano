@@ -330,17 +330,21 @@ async function handleFiles(files: File[]) {
       const chunksWithIds = await getAllChunks()
       const docChunks = chunksWithIds.filter((c) => c.docId === docId)
 
-      if (nanoSession) {
-        console.log('[5/5] Using Nano for indexing...')
-        const cards = await generateIndexCardsBatch(nanoSession, docChunks, (current, total) => {
+      try {
+        console.log('[5/5] Creating fresh Nano session for indexing...')
+        const indexSession = await createSession()
+        console.log('[5/5] Fresh session created, indexing chunks...')
+
+        const cards = await generateIndexCardsBatch(indexSession, docChunks, (current, total) => {
           const pct = Math.round((current / total) * 100)
           setP('index', pct)
           console.log(`[5/5] Nano indexing: ${current}/${total} (${pct}%)`)
         })
         await persistIndexCards(cards)
+        indexSession.destroy()
         console.log('[5/5] Nano indexing done, cards:', cards.size)
-      } else {
-        console.log('[5/5] Using keyword fallback...')
+      } catch (e) {
+        console.error('[5/5] Nano indexing failed, using fallback:', e)
         const fc = new Map()
         for (const c of docChunks) {
           if (c.id === undefined) continue
