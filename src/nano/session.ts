@@ -20,3 +20,16 @@ export async function createSession(): Promise<NanoSession> {
     },
   }
 }
+
+export async function promptWithTimeout(
+  session: NanoSession,
+  input: string,
+  timeoutMs: number = 30000,
+): Promise<string> {
+  return Promise.race([
+    session.prompt(input),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Nano prompt timed out after ${timeoutMs}ms`)), timeoutMs),
+    ),
+  ])
+}

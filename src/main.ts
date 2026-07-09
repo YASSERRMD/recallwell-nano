@@ -3,6 +3,7 @@ import { detectCapability } from './nano/capability'
 import { createSession, type NanoSession } from './nano/session'
 import { parse } from './ingest/parsers'
 import { chunkContent } from './ingest/chunker/splitter'
+import { generateIndexCardsBatch } from './index/batch'
 import { persistIndexCards } from './index/persist'
 import { extractKeywords, extractSummary } from './index/fallback'
 import { listDocuments, addDocument, deleteDocument } from './db/repositories/document'
@@ -329,12 +330,24 @@ async function handleFiles(files: File[]) {
       const chunksWithIds = await getAllChunks()
       const docChunks = chunksWithIds.filter((c) => c.docId === docId)
 
-      const fc = new Map()
-      for (const c of docChunks) {
-        if (c.id === undefined) continue
-        fc.set(c.id, { summary: extractSummary(c.text), keywords: extractKeywords(c.text) })
+      if (nanoSession) {
+        console.log('[5/5] Using Nano for indexing...')
+        const cards = await generateIndexCardsBatch(nanoSession, docChunks, (current, total) => {
+          const pct = Math.round((current / total) * 100)
+          setP('index', pct)
+          console.log(`[5/5] Nano indexing: ${current}/${total} (${pct}%)`)
+        })
+        await persistIndexCards(cards)
+        console.log('[5/5] Nano indexing done, cards:', cards.size)
+      } else {
+        console.log('[5/5] Using keyword fallback...')
+        const fc = new Map()
+        for (const c of docChunks) {
+          if (c.id === undefined) continue
+          fc.set(c.id, { summary: extractSummary(c.text), keywords: extractKeywords(c.text) })
+        }
+        await persistIndexCards(fc)
       }
-      await persistIndexCards(fc)
       setP('index', 100)
       console.log('[5/5] Done')
     } catch (e) {
